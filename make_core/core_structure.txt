@@ -1,0 +1,43 @@
+Karabas Go core file structure v1
+---------------------------------
+
+SIGNATURE + CORE SETUP + BITSTREAM + ROMS + OSD PARAMETERS
+4+32+32+8+1+1+1+1=
+-----------------------------------------------------
+Offset             | N of Bytes | Description 
+-----------------------------------------------------
+0                  | 4          | Signature (kgo1)
+4                  | 32         | Core ID
+36                 | 32         | Core Name
+68                 | 8          | Core Revision
+76                 | 1          | Visible in the core list (1 - visible, 0 - invisible)
+77                 | 1          | Order number (1-255)
+78                 | 1          | Type (0 - boot, 1 - normal osd, 2-255 - reserved)
+79                 | 1          | EEPROM bank (0-3)
+80                 | 4          | Bitstream Length (B)
+84                 | 4          | Roms Length (R)
+88                 | 168        | Reserved
+256                | 256        | EEPROM Data
+512                | 256        | OSD Switches Data
+768                | 256        | Reserved
+... bitstream ...
+1024               | N          | Bitstream
+... roms ...
+1024+B             | 4          | ROM0 Length
+1028+B             | 4          | ROM0 target address
+1032+B             | R0         | ROM0 Data
+... osd parameters ...
+1032+B+R           | 1          | Number of OSD parameters
+1033+B+R           | 1          | Param 0 type (0 - switch, 1 - nv switch, 2 - trigger, 3 - hidden trigger)
+1034+B+R           | 1          | Number of bits to transfer
+1050+B+R           | 16         | Parameter Name
+1051+B+R           | 1          | Default value
+1052+B+R           | 1          | Number of options
+1068+B+R           | 16         | option0
+1084+B+R           | 16         | option1
+...
+1100+B+R           | 16         | Hotkey description
+1116+B+R           | 3          | Hotkey keycodes
+1119+B+R           | 3          | Reserved
+
+
