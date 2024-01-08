@@ -37,7 +37,7 @@ Offset             | N of Bytes | Description
 1084+B+R           | 16         | option1
 ...
 1100+B+R           | 16         | Hotkey description
-1116+B+R           | 3          | Hotkey keycodes
+1116+B+R           | 2          | Hotkey keycodes
 1119+B+R           | 3          | Reserved
 
 

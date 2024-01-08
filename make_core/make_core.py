@@ -52,7 +52,7 @@ o.write(d.name.ljust(32)[:32].encode("ascii")) # core name
 o.write(d.build.ljust(8)[:8].encode("ascii")) # core build
 o.write(b'\x01' if d.visible else b'\x00') # visible
 o.write(d.order.to_bytes(1, 'big')) # order
-o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\x02') # core type
+o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\xff') # core type
 o.write(d.eeprom_bank.to_bytes(1, 'big')) # eeprom bank
 o.write(bitstream_size.to_bytes(4, 'big')) # size of bitstream in bytes
 o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (file sizes + 8 bytes each file)
