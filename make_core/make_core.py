@@ -58,7 +58,9 @@ o.write(bitstream_size.to_bytes(4, 'big')) # size of bitstream in bytes
 o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (file sizes + 8 bytes each file)
 o.write(b'\x00' * 168) # reserved 168 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
-o.write(b'\x00' * 256) # switches 256 bytes
+for osd in d.osd: # write defaults to switches
+    o.write(osd.default.to_bytes(1, 'big'));
+o.write(b'\x00' * (256 - len(d.osd))) # switches 256 bytes
 o.write(b'\x00' * 256) # reserved 256 bytes
 
 # bitstream
