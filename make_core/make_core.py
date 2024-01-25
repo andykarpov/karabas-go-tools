@@ -56,7 +56,8 @@ o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\xff'
 o.write(d.eeprom_bank.to_bytes(1, 'big')) # eeprom bank
 o.write(bitstream_size.to_bytes(4, 'big')) # size of bitstream in bytes
 o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (file sizes + 8 bytes each file)
-o.write(b'\x00' * 168) # reserved 168 bytes
+o.write(d.rtc_mode.to_bytes(1, 'big') if hasattr(d, "rtc_mode") else b'\x00') # rtc mode 0=mc146818a, 1=ds1307
+o.write(b'\x00' * 167) # reserved 167 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
     o.write(osd.default.to_bytes(1, 'big'));

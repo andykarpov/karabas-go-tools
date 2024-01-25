@@ -16,7 +16,8 @@ Offset             | N of Bytes | Description
 79                 | 1          | EEPROM bank (0-3)
 80                 | 4          | Bitstream Length (B)
 84                 | 4          | Roms Length (R)
-88                 | 168        | Reserved
+88                 | 1          | RTC type: 0 = mc146818a mode (default), 1 = ds1307 registers mode
+89                 | 167        | Reserved
 256                | 256        | EEPROM Data
 512                | 256        | OSD Switches Data
 768                | 256        | Reserved
