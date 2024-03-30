@@ -50,14 +50,23 @@ o.write("kgo1".encode("ascii")) # signature
 o.write(d.id.ljust(32)[:32].encode("ascii")) # core id
 o.write(d.name.ljust(32)[:32].encode("ascii")) # core name
 o.write(d.build.ljust(8)[:8].encode("ascii")) # core build
-o.write(b'\x01' if d.visible else b'\x00') # visible
-o.write(d.order.to_bytes(1, 'big')) # order
-o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\xff') # core type
-o.write(d.eeprom_bank.to_bytes(1, 'big')) # eeprom bank
+o.write(b'\x01' if d.visible else b'\x00') # visible (in the list of cores in boot mode)
+o.write(d.order.to_bytes(1, 'big')) # order number 0-255
+# core type
+# 0 - boot (boot mode, osd is a file browser to choose a core from SD1)
+# 1 - osd (normal osd mode, toggled by menu+esc)
+# 2 - fileloader (file loader mode. osd started on core load, on menu+esc it is possible to choose another file to load)
+# 255 - none (osd is hidden)
+o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\x02' if d.type == 'fileloader' else b'\xff')
+o.write(d.eeprom_bank.to_bytes(1, 'big')) # eeprom bank (0-3 - 24c08, 255 - no eeprom, 4-254 - in the core file)
 o.write(bitstream_size.to_bytes(4, 'big')) # size of bitstream in bytes
 o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (file sizes + 8 bytes each file)
 o.write(d.rtc_mode.to_bytes(1, 'big') if hasattr(d, "rtc_mode") else b'\x00') # rtc mode 0=mc146818a, 1=ds1307
-o.write(b'\x00' * 167) # reserved 167 bytes
+o.write(d.dir.ljust(32)[:32].encode('ascii') if hasattr(d, "dir") else b'\x00' * 32) # 32 bytes initial dir in fileloader mode
+o.write(d.filename.ljust(32)[:32].encode('ascii') if hasattr(d, "filename") else b'\x00' * 32) # 32 bytes last selected filename in fileloader mode
+o.write(d.extensions.ljust(32)[:32].encode('ascii') if hasattr(d, "extensions") else b'\x00' * 32) # 39 bytes allowed file extensions (comma separated string) 
+o.write(b'\xFF' * 32) # reserved 32 bytes
+o.write(b'\xFF' * 39) # reserved 39 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
     o.write(osd.default.to_bytes(1, 'big'));
@@ -116,12 +125,12 @@ def parse_hotkey(value):
 # osd
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
 for osd in d.osd:
-    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03') # parameter type
-    o.write(osd.bits.to_bytes(1, 'big')) # number of bits to transfer
+    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\xFF') # parameter type
+    o.write(b'\x00') # reserved
     o.write(osd.name.ljust(16)[:16].encode("ascii")) # option name
-    o.write(osd.default.to_bytes(1, 'big')) # default value
-    o.write(len(osd.options).to_bytes(1, 'big') if osd.options else b'\x00') # number of options
-    if osd.options:
+    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00') # default value
+    o.write(len(osd.options).to_bytes(1, 'big') if hasattr(osd, "options") and osd.options and len(osd.options) > 0 else b'\x00') # number of options
+    if hasattr(osd, "options") and osd.options and len(osd.options) > 0:
         for opt in osd.options:
             o.write(opt.ljust(16)[:16].encode("ascii")) #option name
     o.write(osd.hotkey.ljust(16)[:16].encode("ascii")) # option hotkey

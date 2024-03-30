@@ -12,12 +12,16 @@ Offset             | N of Bytes | Description
 68                 | 8          | Core Revision
 76                 | 1          | Visible in the core list (1 - visible, 0 - invisible)
 77                 | 1          | Order number (1-255)
-78                 | 1          | Type (0 - boot, 1 - normal osd, 2-255 - reserved)
+78                 | 1          | Type (0 - boot, 1 - normal osd, 2 - fileloader, 3-255 - reserved)
 79                 | 1          | EEPROM bank (0-3)
 80                 | 4          | Bitstream Length (B)
 84                 | 4          | Roms Length (R)
 88                 | 1          | RTC type: 0 = mc146818a mode (default), 1 = ds1307 registers mode
-89                 | 167        | Reserved
+89                 | 32         | Initial directory in fileloader mode
+121                | 32         | Last selected filename in fileloader mode
+153                | 32         | Allowed fileloader file extensions (comma separated)
+185                | 32         | Reserved
+217                | 39         | Reserved
 256                | 256        | EEPROM Data
 512                | 256        | OSD Switches Data
 768                | 256        | Reserved
@@ -29,8 +33,14 @@ Offset             | N of Bytes | Description
 1032+B             | R0         | ROM0 Data
 ... osd parameters ...
 1032+B+R           | 1          | Number of OSD parameters
-1033+B+R           | 1          | Param 0 type (0 - switch, 1 - nv switch, 2 - trigger, 3 - hidden trigger)
-1034+B+R           | 1          | Number of bits to transfer
+1033+B+R           | 1          | Param 0 type (
+                                        0 - switch (S in json), 
+                                        1 - non-volatile switch (N in json), 
+                                        2 - trigger (T in json), 
+                                        3 - hidden trigger (H in json), 
+                                        4 - plain text line (P in json)
+                                  )
+1034+B+R           | 1          | Reserved
 1050+B+R           | 16         | Parameter Name
 1051+B+R           | 1          | Default value
 1052+B+R           | 1          | Number of options
