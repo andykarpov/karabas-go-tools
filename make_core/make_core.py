@@ -69,7 +69,7 @@ o.write(b'\xFF' * 32) # reserved 32 bytes
 o.write(b'\xFF' * 39) # reserved 39 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
-    o.write(osd.default.to_bytes(1, 'big'));
+    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00');
 o.write(b'\x00' * (256 - len(d.osd))) # switches 256 bytes
 o.write(b'\x00' * 256) # reserved 256 bytes
 
