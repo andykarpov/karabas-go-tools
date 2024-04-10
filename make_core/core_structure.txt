@@ -47,7 +47,7 @@ Offset             | N of Bytes | Description
 1068+B+R           | 16         | option0
 1084+B+R           | 16         | option1
 ...
-1100+B+R           | 16         | Hotkey description
+1100+B+R           | 16         | Hotkey description (or second 16 bytes of text line)
 1116+B+R           | 2          | Hotkey keycodes
 1119+B+R           | 3          | Reserved
 

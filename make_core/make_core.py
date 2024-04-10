@@ -133,8 +133,11 @@ for osd in d.osd:
     if hasattr(osd, "options") and osd.options and len(osd.options) > 0:
         for opt in osd.options:
             o.write(opt.ljust(16)[:16].encode("ascii")) #option name
-    o.write(osd.hotkey.ljust(16)[:16].encode("ascii")) # option hotkey
-    o.write(parse_hotkey(osd.hotkey)) # option keycodes (parsed)
+    if (osd.type == 'P'):
+        o.write(osd.name.ljust(32)[16:32].encode("ascii")) # second part of text line as hotkey
+    else:
+        o.write(osd.hotkey.ljust(16)[:16].encode("ascii") if hasattr(osd, "hotkey") else "                ".encode("ascii")) # option hotkey
+    o.write(parse_hotkey(osd.hotkey) if hasattr(osd, "hotkey") else b'\00'*2) # option keycodes (parsed)
     o.write(b'\x00'*3) # reserved
 
 #print(d.name, d.build)
