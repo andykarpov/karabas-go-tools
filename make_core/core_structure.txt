@@ -38,17 +38,18 @@ Offset             | N of Bytes | Description
                                         1 - non-volatile switch (N in json), 
                                         2 - trigger (T in json), 
                                         3 - hidden trigger (H in json), 
-                                        4 - plain text line (P in json)
+                                        4 - plain text line (P in json),
+                                        5 - file mounter (F in json)
                                   )
 1034+B+R           | 1          | Reserved
 1050+B+R           | 16         | Parameter Name
 1051+B+R           | 1          | Default value
-1052+B+R           | 1          | Number of options
-1068+B+R           | 16         | option0
-1084+B+R           | 16         | option1
+1052+B+R           | 1          | Number of options (or slot number for file mounter)
+1068+B+R           | 16         | option0 (or 256 bytes for file mounter extension)
+1084+B+R           | 16         | option1 (or 256 bytes for file mounter initial dirname)
+1100+B+R           | 16         | option2 (or 256 bytes for file mounter filename)
 ...
 1100+B+R           | 16         | Hotkey description (or second 16 bytes of text line)
 1116+B+R           | 2          | Hotkey keycodes
 1119+B+R           | 3          | Reserved
-
 
