@@ -126,13 +126,13 @@ def parse_hotkey(value):
 # osd
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
 for osd in d.osd:
-    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\x05' if osd.type =='F' else b'\xFF') # parameter type
+    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\x05' if osd.type =='F' else b'\x06' if osd.type == 'FL' else b'\xFF') # parameter type
     o.write(b'\x00') # reserved
     o.write(osd.name.ljust(16)[:16].encode("ascii")) # option name
     o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00') # default value
     
     # file mounter struct
-    if osd.type=='F':
+    if osd.type=='F' or osd.type=='FL':
         o.write(osd.slot.to_bytes(1, 'big') if hasattr(osd, "slot") else b'\x01')
         o.write(osd.extensions.ljust(256)[:256].encode('ascii') if hasattr(osd, "extensions") else b'\x00' * 256)
         o.write(osd.dir.ljust(256)[:256].encode('ascii') if hasattr(osd, "dir") else b'\x00' * 256)
