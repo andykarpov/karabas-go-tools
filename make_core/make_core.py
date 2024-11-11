@@ -93,7 +93,8 @@ kb_keys = {
     "A": 0x04, "B": 0x05, "C": 0x06, "D": 0x07, "E": 0x08, "F": 0x09, "G": 0x0a, "H": 0x0b,
     "I": 0x0c, "J": 0x0d, "K": 0x0e, "L": 0x0f, "M": 0x10, "N": 0x11, "O": 0x12, "P": 0x13,
     "Q": 0x14, "R": 0x15, "S": 0x16, "T": 0x17, "U": 0x18, "V": 0x19, "W": 0x1a, "X": 0x1b,
-    "Y": 0x1c, "Z": 0x1d,
+    "Y": 0x1c, "Z": 0x1d, "1": 0x1e, "2": 0x1f, "3": 0x20, "4": 0x21, "5": 0x22, "6": 0x23,
+    "7": 0x24, "8": 0x25, "9": 0x26, "0": 0x27,
 
     "Enter": 0x28, "Esc": 0x29, "Bkspace": 0x2a, "Tab": 0x2b, "Space": 0x2c, "Caps": 0x39,
     
@@ -125,14 +126,25 @@ def parse_hotkey(value):
 # osd
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
 for osd in d.osd:
-    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\xFF') # parameter type
+    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\x05' if osd.type =='F' else b'\x06' if osd.type == 'FL' else b'\xFF') # parameter type
     o.write(b'\x00') # reserved
     o.write(osd.name.ljust(16)[:16].encode("ascii")) # option name
     o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00') # default value
-    o.write(len(osd.options).to_bytes(1, 'big') if hasattr(osd, "options") and osd.options and len(osd.options) > 0 else b'\x00') # number of options
-    if hasattr(osd, "options") and osd.options and len(osd.options) > 0:
-        for opt in osd.options:
-            o.write(opt.ljust(16)[:16].encode("ascii")) #option name
+    
+    # file mounter struct
+    if osd.type=='F' or osd.type=='FL':
+        o.write(osd.slot.to_bytes(1, 'big') if hasattr(osd, "slot") else b'\x01')
+        o.write(osd.extensions.ljust(256)[:256].encode('ascii') if hasattr(osd, "extensions") else b'\x00' * 256)
+        o.write(osd.dir.ljust(256)[:256].encode('ascii') if hasattr(osd, "dir") else b'\x00' * 256)
+        o.write(osd.filename.ljust(256)[:256].encode('ascii') if hasattr(osd, "filename") else b'\x00' * 256)
+    # osd options struct
+    else:
+        o.write(len(osd.options).to_bytes(1, 'big') if hasattr(osd, "options") and osd.options and len(osd.options) > 0 else b'\x00') # number of options
+        if hasattr(osd, "options") and osd.options and len(osd.options) > 0:
+            for opt in osd.options:
+                o.write(opt.ljust(16)[:16].encode("ascii")) #option name
+
+    # hotkey or second line of text
     if (osd.type == 'P'):
         o.write(osd.name.ljust(32)[16:32].encode("ascii")) # second part of text line as hotkey
     else:
