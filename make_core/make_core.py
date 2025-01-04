@@ -3,7 +3,7 @@
 #########################################################
 # Karabas Go Core Generator v1.0                        #
 #                                                       #
-# (c) 2023 Andy Karpov <andy.karpov@gmail.com>          #
+# (c) 2023, 2024 Andy Karpov <andy.karpov@gmail.com>    #
 #########################################################
 
 import json
@@ -38,14 +38,21 @@ d = json.loads(file_read(filename), object_hook=lambda d: SimpleNamespace(**d))
 bitstream = file_read(d.bitstream, "rb")
 bitstream_size = len(bitstream)
 
+# total rom size
 rom_size = 0
 for rom in d.roms:
     r = file_read(rom.filename, "rb")
-    rom_size = rom_size + len(r)
+    rom_is_external = rom.external if hasattr(rom, "external") else False
+    # embedded rom
+    if not rom_is_external:
+        rom_size = rom_size + len(r)
+    # external rom - only a filename size is appended
+    else:
+        rom_size = rom_size + len(rom.filename)
 
 o = open(outfile, "wb")
 
-# header
+# header block
 o.write("kgo1".encode("ascii")) # signature
 o.write(d.id.ljust(32)[:32].encode("ascii")) # core id
 o.write(d.name.ljust(32)[:32].encode("ascii")) # core name
@@ -64,24 +71,31 @@ o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (fil
 o.write(d.rtc_mode.to_bytes(1, 'big') if hasattr(d, "rtc_mode") else b'\x00') # rtc mode 0=mc146818a, 1=ds1307
 o.write(d.dir.ljust(32)[:32].encode('ascii') if hasattr(d, "dir") else b'\x00' * 32) # 32 bytes initial dir in fileloader mode
 o.write(d.filename.ljust(32)[:32].encode('ascii') if hasattr(d, "filename") else b'\x00' * 32) # 32 bytes last selected filename in fileloader mode
-o.write(d.extensions.ljust(32)[:32].encode('ascii') if hasattr(d, "extensions") else b'\x00' * 32) # 39 bytes allowed file extensions (comma separated string) 
+o.write(d.extensions.ljust(32)[:32].encode('ascii') if hasattr(d, "extensions") else b'\x00' * 32) # 32 bytes allowed file extensions (comma separated string) 
+o.write(d.spi_freq.to_bytes(1, 'big') if hasattr(d, "spi_freq") else b'\x00') # spi freq
 o.write(b'\xFF' * 32) # reserved 32 bytes
-o.write(b'\xFF' * 39) # reserved 39 bytes
+o.write(b'\xFF' * 38) # reserved 38 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
-    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00');
+    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00')
 o.write(b'\x00' * (256 - len(d.osd))) # switches 256 bytes
 o.write(b'\x00' * 256) # reserved 256 bytes
 
-# bitstream
+# bitstream block
 o.write(bitstream)
 
-# roms
+# roms block
 for rom in d.roms:
     r = file_read(rom.filename, "rb")
-    o.write(len(r).to_bytes(4, 'big'))
+    rom_is_external = rom.external if hasattr(rom, "external") else False
+    # rom size is a file size if rom is embedded or length of the filename if rom is external
+    r_size = len(r) if not rom_is_external else len(rom.filename)
+    # set the upper bit of r_size as rom_is_external flag
+    r_size = r_size | (1 << 31)
+    o.write(r_size.to_bytes(4, 'big'))
     o.write(rom.address.to_bytes(4, 'big'))
-    o.write(r)
+    # dump rom content if rom is embedded or filename if rom is extenrnal
+    o.write(r) if not rom_is_external else o.write(rom.filename)
 
 # usb key map
 
@@ -133,7 +147,11 @@ for osd in d.osd:
     
     # file mounter struct
     if osd.type=='F' or osd.type=='FL':
-        o.write(osd.slot.to_bytes(1, 'big') if hasattr(osd, "slot") else b'\x01')
+        slot = osd.slot if hasattr(osd, "slot") else 0
+        autoload = osd.autoload if hasattr(osd, "autoload") else 0
+        if autoload: # write autoload bit as 7th bit of slot value
+            slot = slot | (1 << 7)
+        o.write(slot.to_bytes(1, 'big'))
         o.write(osd.extensions.ljust(256)[:256].encode('ascii') if hasattr(osd, "extensions") else b'\x00' * 256)
         o.write(osd.dir.ljust(256)[:256].encode('ascii') if hasattr(osd, "dir") else b'\x00' * 256)
         o.write(osd.filename.ljust(256)[:256].encode('ascii') if hasattr(osd, "filename") else b'\x00' * 256)

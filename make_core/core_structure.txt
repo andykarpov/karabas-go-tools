@@ -17,20 +17,21 @@ Offset             | N of Bytes | Description
 80                 | 4          | Bitstream Length (B)
 84                 | 4          | Roms Length (R)
 88                 | 1          | RTC type: 0 = mc146818a mode (default), 1 = ds1307 registers mode
-89                 | 32         | Initial directory in fileloader mode
-121                | 32         | Last selected filename in fileloader mode
+89                 | 32         | Initial directory in fileloader mode (writable by firmware to store last selected dir)
+121                | 32         | Last selected filename in fileloader mode (writable by firmware to store last selected file)
 153                | 32         | Allowed fileloader file extensions (comma separated)
-185                | 32         | Reserved
-217                | 39         | Reserved
-256                | 256        | EEPROM Data
-512                | 256        | OSD Switches Data
+185                | 1          | Core SPI frequency (0 = default)
+186                | 32         | Reserved
+218                | 38         | Reserved
+256                | 256        | EEPROM Data (writable block by firmware in case of EEPROM bank > 3)
+512                | 256        | OSD Switches Data (writable block by firmware)
 768                | 256        | Reserved
 ... bitstream ...
 1024               | N          | Bitstream
 ... roms ...
-1024+B             | 4          | ROM0 Length
+1024+B             | 4          | ROM0 Length (or ROM0 filename length if bit31=1 that means external ROM on sd card)
 1028+B             | 4          | ROM0 target address
-1032+B             | R0         | ROM0 Data
+1032+B             | R0         | ROM0 Data (or ROM0 filename for external ROM)
 ... osd parameters ...
 1032+B+R           | 1          | Number of OSD parameters
 1033+B+R           | 1          | Param 0 type (
@@ -39,15 +40,16 @@ Offset             | N of Bytes | Description
                                         2 - trigger (T in json), 
                                         3 - hidden trigger (H in json), 
                                         4 - plain text line (P in json),
-                                        5 - file mounter (F in json)
+                                        5 - file mounter (F in json),
+                                        6 - file loader (FL in json)
                                   )
 1034+B+R           | 1          | Reserved
 1050+B+R           | 16         | Parameter Name
 1051+B+R           | 1          | Default value
-1052+B+R           | 1          | Number of options (or slot number for file mounter)
-1068+B+R           | 16         | option0 (or 256 bytes for file mounter extension)
-1084+B+R           | 16         | option1 (or 256 bytes for file mounter initial dirname)
-1100+B+R           | 16         | option2 (or 256 bytes for file mounter filename)
+1052+B+R           | 1          | Number of options (or slot number for file mounter, autoload bit as bit7)
+1068+B+R           | 16(256)    | option0 (or 256 bytes for file mounter extension)
+1084+B+R           | 16(256)    | option1 (or 256 bytes for file mounter initial dirname - writable by firmware)
+1100+B+R           | 16(256)    | option2 (or 256 bytes for file mounter filename - writable by firmware)
 ...
 1100+B+R           | 16         | Hotkey description (or second 16 bytes of text line)
 1116+B+R           | 2          | Hotkey keycodes
