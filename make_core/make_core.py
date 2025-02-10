@@ -91,7 +91,7 @@ for rom in d.roms:
     # rom size is a file size if rom is embedded or length of the filename if rom is external
     r_size = len(r) if not rom_is_external else len(rom.filename)
     # set the upper bit of r_size as rom_is_external flag
-    r_size = r_size | (1 << 31)
+    r_size = r_size | (1 << 31) if rom_is_external else r_size;
     o.write(r_size.to_bytes(4, 'big'))
     o.write(rom.address.to_bytes(4, 'big'))
     # dump rom content if rom is embedded or filename if rom is extenrnal
