@@ -10,18 +10,17 @@ import argparse
 import sys
 import os
 import numpy as np
+from pathlib import Path
 
 
 msg = "Karabas Go Spec256 snapshot convertor v1.0"
 parser = argparse.ArgumentParser(description = msg)
 parser.add_argument('sna_file')
-parser.add_argument('gfx_file')
-parser.add_argument('output_file')
 args = parser.parse_args()
 
-sna_filename = args.sna_file
-gfx_filename = args.gfx_file
-outfile = args.output_file
+sna_filename = Path(args.sna_file)
+gfx_filename = sna_filename.with_suffix(".GFX")
+outfile = sna_filename.with_suffix(".256")
 
 def file_check(name):
     if not os.path.isfile(name):
@@ -136,10 +135,10 @@ def get_sp():
     sp = sp + 2
     return (sp & 0xFFFF).to_bytes(2, 'big')
 
-sp = get_sp()
-print (f"SP={sp}")
-pc = get_pc()
-print (f"PC={pc}")
+#sp = get_sp()
+#print (f"SP={sp}")
+#pc = get_pc()
+#print (f"PC={pc}")
 
 write_reg(21)      # [7:0]   A
 write_reg(22)      # [15:8]  F
@@ -175,16 +174,9 @@ write_reg(2)       # [191:184] H'
 write_reg(15)      # [199:192] Y l
 write_reg(16)      # [207:200] Y h
 
-# from MIST snap_loader
-# 25: snap_REG[209:208] <= ioctl_data[1:0]; //im
-# 19: snap_REG[211:210] <= {ioctl_data[2], 1'b0}; //iff2,iff1
-
-iff = 2 if regs[19] & 0x04 else 0
-print(f"reg19 = {regs[19]}")
-print(f"IFF = {iff}")
-print(f"IM = {regs[25]}")
+iff = regs[19]
 im_iff = regs[25] + (iff << 2)
-print(f"IMIFF = {im_iff}")
+#print(f"IM={regs[25]}, IFF={regs[19]}, im+iff={im_iff}")
 o.write(im_iff.to_bytes(1, 'big'))      # [215:208] {4'b0000, IFF[1:0], IM[1:0]}
 
 write_reg(26) # [223:216] border
