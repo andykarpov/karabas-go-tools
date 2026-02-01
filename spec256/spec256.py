@@ -55,8 +55,10 @@ if gfx_size != 393216:
     print(f"GFX size should be exactly 393216 bytes, got {gfx_size}")
     exit(1)
 
+print(f"Converting {sna_filename} + {gfx_filename} into {outfile}")
 o = open(outfile, "wb")
 
+# трансформация SNA + GFX в сырую память для загрузки на стороне FPGA
 for i in range(49152):
     byte_sna = sna[i]
     word_gfx = gfx[i*8:i*8+8]
@@ -72,21 +74,7 @@ for i in range(49152):
         o.write(byte_res.to_bytes(1, 'big'))
         o.write(byte_res.to_bytes(1, 'big'))
     else:
-        """ 
-        zxpoly emul on java:
-        for (int offset = 0; offset < dataLen; offset += 8) {
-              for (int ctx = 0; ctx < 8; ctx++) {
-                final int bitMask = 1 << ctx;
-                int accumulator = 0;
-                for (int i = 0; i < 8; i++) {
-                  if ((from.getGfxData()[offset + i] & bitMask) != 0) {
-                    accumulator |= 1 << i;
-                  }
-                }
-                result[offset + ctx] = (byte) accumulator;
-              }
-            }
-        """
+        # формирование битпланов
         for ctx in range(8):
             bitmask = 1 << ctx
             accumulator = 0
@@ -97,6 +85,8 @@ for i in range(49152):
             o.write(accumulator.to_bytes(1, 'big'))
 
 """
+SNA header:
+
 ; 0        1        Регистр I.
 ; 1        2        Регистровая пара HL'.
 ; 3        2        Регистровая пара DE'.
@@ -114,31 +104,13 @@ for i in range(49152):
 ; 23       2        Указатель на вершину стэка (SP).
 ; 25       1        Режим прерываний: 0=IM0, 1=IM1, 2=IM2.
 ; 26       1        Цвет бордюра, 0-7.
-"""
 
-# todo: записать в порядке восстановления T80:
-# -- IFF2(1 bit), IFF1(1 bit), IM(2 bits), IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+порядок регистров T80 (для восстановления через DIR / DIRSet):
+IFF2(1 bit), IFF1(1 bit), IM(2 bits), IY, HL', DE', BC', IX, HL, DE, BC, PC, SP, R, I, F', A', F, A
+"""
 
 def write_reg(reg):
     o.write(regs[reg].to_bytes(1, 'big'))
-
-def get_pc():
-    sp = regs[23] + regs[24]*256
-    if sp >= 16384:
-        pc = file_read(sna_filename, "rb", sp - 16384, 2)
-        return pc
-    else:
-        return [0x00, 0x00]
-
-def get_sp():
-    sp = regs[23] + regs[24]*256
-    sp = sp + 2
-    return (sp & 0xFFFF).to_bytes(2, 'big')
-
-#sp = get_sp()
-#print (f"SP={sp}")
-#pc = get_pc()
-#print (f"PC={pc}")
 
 write_reg(21)      # [7:0]   A
 write_reg(22)      # [15:8]  F
@@ -146,17 +118,10 @@ write_reg(7)       # [23:15] A'
 write_reg(8)       # [31:16] F'
 write_reg(0)       # [39:32] I
 write_reg(20)      # [47:40] R
-
 write_reg(23)      # [55:48] SP l
 write_reg(24)      # [63:56] SP h
-#o.write(sp[1].to_bytes(1, 'big'))     # [55:48] SP l
-#o.write(sp[0].to_bytes(1, 'big'))     # [63:56] SP h
-
 o.write((0x72).to_bytes(1, 'big'))     # [71:64] PC l # RETN
 o.write((0x00).to_bytes(1, 'big'))     # [79:72] PC h
-#o.write(pc[1].to_bytes(1, 'big'))     # [71:64] PC l # RETN
-#o.write(pc[0].to_bytes(1, 'big'))     # [79:72] PC h
-
 write_reg(13)      # [87:80] C
 write_reg(14)      # [95:88] B
 write_reg(11)      # [103:96]  E
@@ -174,9 +139,9 @@ write_reg(2)       # [191:184] H'
 write_reg(15)      # [199:192] Y l
 write_reg(16)      # [207:200] Y h
 
-iff = regs[19]
+iff = 2 if regs[19] & 0x04 else 0
 im_iff = regs[25] + (iff << 2)
-#print(f"IM={regs[25]}, IFF={regs[19]}, im+iff={im_iff}")
+print(f"IM={regs[25]}, IFF={iff}, im+iff={im_iff}")
 o.write(im_iff.to_bytes(1, 'big'))      # [215:208] {4'b0000, IFF[1:0], IM[1:0]}
 
 write_reg(26) # [223:216] border
