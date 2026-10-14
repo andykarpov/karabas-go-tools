@@ -38,17 +38,16 @@ d = json.loads(file_read(filename), object_hook=lambda d: SimpleNamespace(**d))
 bitstream = file_read(d.bitstream, "rb")
 bitstream_size = len(bitstream)
 
+# rom payloads: the rom data for embedded roms, the file name (on the sd card) for external ones
+def rom_payload(rom):
+    if hasattr(rom, "external") and rom.external:
+        return rom.filename.encode("ascii")
+    return file_read(rom.filename, "rb")
+
 # total rom size
 rom_size = 0
 for rom in d.roms:
-    r = file_read(rom.filename, "rb")
-    rom_is_external = rom.external if hasattr(rom, "external") else False
-    # embedded rom
-    if not rom_is_external:
-        rom_size = rom_size + len(r)
-    # external rom - only a filename size is appended
-    else:
-        rom_size = rom_size + len(rom.filename)
+    rom_size = rom_size + len(rom_payload(rom))
 
 o = open(outfile, "wb")
 
@@ -86,16 +85,13 @@ o.write(bitstream)
 
 # roms block
 for rom in d.roms:
-    r = file_read(rom.filename, "rb")
-    rom_is_external = rom.external if hasattr(rom, "external") else False
-    # rom size is a file size if rom is embedded or length of the filename if rom is external
-    r_size = len(r) if not rom_is_external else len(rom.filename)
-    # set the upper bit of r_size as rom_is_external flag
-    r_size = r_size | (1 << 31) if rom_is_external else r_size;
+    r = rom_payload(rom)
+    rom_is_external = hasattr(rom, "external") and rom.external
+    # bit 31 of the length marks an external rom (the payload is its file name)
+    r_size = len(r) | (1 << 31) if rom_is_external else len(r)
     o.write(r_size.to_bytes(4, 'big'))
     o.write(rom.address.to_bytes(4, 'big'))
-    # dump rom content if rom is embedded or filename if rom is extenrnal
-    o.write(r) if not rom_is_external else o.write(rom.filename)
+    o.write(r)
 
 # usb key map
 
@@ -116,26 +112,29 @@ kb_keys = {
     "F8": 0x41, "F9": 0x42, "F10": 0x43, "F11": 0x44, "F12": 0x45,
 
     "PtrScr": 0x46, "ScrLk": 0x47, "Pause": 0x48, "Ins": 0x49, "Del": 0x4c, "Home": 0x4a,
-    "End": 0x4d, "PgUp": 0x4b, "PgDn": 0x4e, "Right": 0xf, "Left": 0x50, "Down": 0x51, "Up": 0x52
+    "End": 0x4d, "PgUp": 0x4b, "PgDn": 0x4e, "Right": 0x4f, "Left": 0x50, "Down": 0x51, "Up": 0x52
 }
 
-# parse string of hotkeys into bytearray of usb keycodes
+# parse a hotkey ("Menu+F6", "Ctrl+Alt+Del", "F12") into the 2 bytes the firmware reads:
+# the modifier mask and the usb keycode. Exactly one non-modifier key is allowed: any other
+# length would shift every following osd item in the core file.
 def parse_hotkey(value):
-    ret = bytearray()
-    hotkeys = value.split('+', 3)
+    if value.strip() == "":
+        return bytearray(2) # no hotkey
     special = 0
-    for h in hotkeys:
-        if h in kb_special:
-            special = special + kb_special[h]
-    ret.append(special)
     keys = []
-    for h in hotkeys:
-        if h in kb_keys:
+    for h in value.split('+'):
+        if h in kb_special:
+            special = special | kb_special[h]
+        elif h in kb_keys:
             keys.append(kb_keys[h])
-    if len(keys):
-        for k in keys[:2]:
-            ret.append(k)
-    return ret
+        else:
+            print("Unknown key '%s' in hotkey '%s'" % (h, value))
+            exit(1)
+    if len(keys) != 1:
+        print("Hotkey '%s' must have exactly one key besides Ctrl / Shift / Alt / Menu" % value)
+        exit(1)
+    return bytearray([special, keys[0]])
 
 # osd
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
@@ -167,7 +166,7 @@ for osd in d.osd:
         o.write(osd.name.ljust(32)[16:32].encode("ascii")) # second part of text line as hotkey
     else:
         o.write(osd.hotkey.ljust(16)[:16].encode("ascii") if hasattr(osd, "hotkey") else "                ".encode("ascii")) # option hotkey
-    o.write(parse_hotkey(osd.hotkey) if hasattr(osd, "hotkey") else b'\00'*2) # option keycodes (parsed)
+    o.write(parse_hotkey(osd.hotkey) if hasattr(osd, "hotkey") else b'\x00' * 2) # option keycodes (parsed)
     o.write(b'\x00'*3) # reserved
 
 #print(d.name, d.build)
