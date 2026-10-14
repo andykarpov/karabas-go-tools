@@ -77,7 +77,11 @@ Core types:
 
 - `address` is a 32-bit target address. Its meaning is up to the core: for example, TS-Conf maps bit 31 (`0x80000000` = 2147483648) to the General Sound ROM.
 - The ROMs are sent to the core in this order on every core load. See `CMD_ROMLOADER` / `CMD_ROMDATA` in the [protocol description](https://github.com/andykarpov/karabas-go-firmware/blob/master/docs/protocol.md).
-- `"external": true` is meant to store only the file name and let the firmware load the ROM from the SD card. **It does not work in the current `make_core.py`**: see Known issues.
+- `"external": true` stores only the file name in the core file. The firmware loads the ROM from that path on the SD card at every core start and shows `NO FILE` if it is missing. The file does not have to exist when the core file is built:
+
+  ```json
+  {"filename": "roms/zxnext.rom", "address": 0, "external": true}
+  ```
 
 ### OSD items
 
@@ -114,7 +118,7 @@ A hotkey is **zero or more modifiers and exactly one key**, joined with `+`:
 - The text (≤ 16 chars) is shown in the menu next to the item.
 - **Reserved by the firmware:** `Menu+Esc` toggles the OSD and `Ctrl+Alt+Bkspace` reboots the board. Don't use them.
 
-A hotkey must have exactly one non-modifier key, see Known issues.
+`make_core.py` stops with an error on a hotkey without a key, with two keys or with an unknown name: such a hotkey would not fit into the 2 bytes the firmware reads. An empty string `""` means no hotkey.
 
 ### Examples
 
@@ -288,9 +292,3 @@ One item:
 | 3 | Reserved |
 
 Each item's default is also written to its byte at offset 512 + index.
-
-## Known issues of make_core.py
-
-1. **A hotkey without a key, or with two keys, breaks the file.** For example `"Menu"` or `"A+B"`. `make_core.py` writes 1 byte of modifiers plus 0–2 key codes, but the firmware always reads exactly 2 bytes. Every OSD item after such a hotkey is then read from the wrong place. Use exactly one key.
-2. **The `Right` key code is wrong.** It is `0x0F` (the code of `L`) instead of `0x4F`, so a hotkey with `Right` actually reacts to `L`.
-3. **`"external": true` ROMs fail.** The script writes the file name as a Python `str` to a binary file, which raises an exception. It also requires the ROM file to exist locally.
