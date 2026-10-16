@@ -67,7 +67,7 @@ o.write(b'\x00' if d.type == 'boot' else b'\x01' if d.type == 'osd' else b'\x02'
 o.write(d.eeprom_bank.to_bytes(1, 'big')) # eeprom bank (0-3 - 24c08, 255 - no eeprom, 4-254 - in the core file)
 o.write(bitstream_size.to_bytes(4, 'big')) # size of bitstream in bytes
 o.write((rom_size + len(d.roms)*8).to_bytes(4, 'big')) # size of roms block (file sizes + 8 bytes each file)
-o.write(d.rtc_mode.to_bytes(1, 'big') if hasattr(d, "rtc_mode") else b'\x00') # rtc mode 0=mc146818a, 1=ds1307
+o.write(d.rtc_mode.to_bytes(1, 'big') if hasattr(d, "rtc_mode") else b'\x00') # rtc mode 0=mc146818a, 1=ds1307, 2=zx evolution, 3=msm6242b (amiga)
 o.write(d.dir.ljust(32)[:32].encode('ascii') if hasattr(d, "dir") else b'\x00' * 32) # 32 bytes initial dir in fileloader mode
 o.write(d.filename.ljust(32)[:32].encode('ascii') if hasattr(d, "filename") else b'\x00' * 32) # 32 bytes last selected filename in fileloader mode
 o.write(d.extensions.ljust(32)[:32].encode('ascii') if hasattr(d, "extensions") else b'\x00' * 32) # 32 bytes allowed file extensions (comma separated string) 
@@ -152,8 +152,10 @@ for osd in d.osd:
             slot = slot | (1 << 7)
         o.write(slot.to_bytes(1, 'big'))
         o.write(osd.extensions.ljust(256)[:256].encode('ascii') if hasattr(osd, "extensions") else b'\x00' * 256)
-        o.write(osd.dir.ljust(256)[:256].encode('ascii') if hasattr(osd, "dir") else b'\x00' * 256)
-        o.write(osd.filename.ljust(256)[:256].encode('ascii') if hasattr(osd, "filename") else b'\x00' * 256)
+        # dir and filename are padded with NULs: the firmware uses them as they are, and a dir
+        # padded with spaces ("/amiga" + 250 spaces) does not exist
+        o.write(osd.dir.ljust(256, '\0')[:256].encode('ascii') if hasattr(osd, "dir") else b'\x00' * 256)
+        o.write(osd.filename.ljust(256, '\0')[:256].encode('ascii') if hasattr(osd, "filename") else b'\x00' * 256)
     # osd options struct
     else:
         o.write(len(osd.options).to_bytes(1, 'big') if hasattr(osd, "options") and osd.options and len(osd.options) > 0 else b'\x00') # number of options
