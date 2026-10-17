@@ -140,7 +140,9 @@ def parse_hotkey(value):
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
 for osd in d.osd:
     o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\x05' if osd.type =='F' else b'\x06' if osd.type == 'FL' else b'\xFF') # parameter type
-    o.write(b'\x00') # reserved
+    # flags: bit 0 = an F item that can be a physical floppy drive ("physical": 1, Karabas Go)
+    flags = 1 if osd.type == 'F' and getattr(osd, "physical", 0) else 0
+    o.write(flags.to_bytes(1, 'big'))
     o.write(osd.name.ljust(16)[:16].encode("ascii")) # option name
     o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00') # default value
     
