@@ -51,7 +51,7 @@ The file must be strict JSON: no comments, no trailing commas (`{...},` before `
 | `order` | 0–255 | yes | Sort order in the core list. |
 | `type` | string | yes | `boot`, `osd`, `fileloader`; anything else (e.g. `hidden`, `none`) = no OSD. See below. |
 | `eeprom_bank` | 0–255 | yes | `0`–`3`: a bank of the on-board 24C08 EEPROM; `4`–`254`: 256 bytes stored inside the core file; `255`: no EEPROM. |
-| `rtc_mode` | 0–2 | no (0) | RTC register model: `0` MC146818A, `1` DS1307, `2` ZX Evolution (MC146818A, always BCD). |
+| `rtc_mode` | 0–3 | no (0) | RTC register model: `0` MC146818A, `1` DS1307, `2` ZX Evolution (MC146818A, always BCD), `3` MSM6242B (Amiga, 13 BCD digits; firmware with MSM6242B support). |
 | `spi_freq` | MHz | no (0) | Clock of the MCU ↔ FPGA SPI link for this core. `0` = default 16 MHz. |
 | `dir` | string, ≤ 32 | no | `fileloader` cores: initial directory on the SD card. |
 | `extensions` | string, ≤ 32 | no | `fileloader` cores: allowed extensions, comma separated (`.rom,.bin`). |
@@ -94,8 +94,8 @@ Every item has a `type` and a `name`, at most 16 characters (a text line: 32). T
 | `T` | Trigger: a button. | `hotkey` (`options: null`, `default: 0`) | `CMD_SWITCHES (index, 1)`, then `(index, 0)` 100 ms later. |
 | `H` | Hidden trigger: like `T`, not shown in the menu. | `hotkey` | same as `T`. |
 | `P` | Plain text line, up to 32 characters. | `name` | nothing. |
-| `FL` | File loader: pick a file, it is sent to the core at once. | `slot` (0–3), `extensions`, `hotkey`, optional `autoload` (bool) | `CMD_IOCTL_*` sequence. |
-| `F` | File mounter: mount a disk image. | `slot`, `extensions`, `hotkey`, `autoload` | `CMD_IMG_*`. **Work in progress:** the firmware only reports the slot and the size. |
+| `FL` | File loader: pick a file, it is sent to the core at once. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename` (the default file), optional `autoload` (bool: the file is also sent at core start, if it exists) | `CMD_IOCTL_*` sequence. |
+| `F` | File mounter: mount a disk image. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename` | `CMD_IMG_*`: the core reads and writes 512-byte sectors of the image. |
 
 `default` is the index of the default option. `hotkey` is described below. The key `bits` that appears in some cores' JSON is ignored by `make_core.py`. It only notes how many bits the core decodes.
 
@@ -281,8 +281,8 @@ One item:
 | | **`F` / `FL`:** |
 | 1 | Slot (bits 0–6), autoload flag (bit 7) |
 | 256 | Extensions |
-| 256 | Directory. The firmware writes the last directory here. |
-| 256 | File name. The firmware writes the last file here. |
+| 256 | Directory, padded with NULs. The firmware writes the last directory here. |
+| 256 | File name, padded with NULs. The firmware writes the last file here. |
 | | **other types:** |
 | 1 | Number of options `n` (the firmware reads at most 8) |
 | 16 × n | Option names |
