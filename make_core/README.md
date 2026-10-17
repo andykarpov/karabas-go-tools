@@ -95,7 +95,7 @@ Every item has a `type` and a `name`, at most 16 characters (a text line: 32). T
 | `H` | Hidden trigger: like `T`, not shown in the menu. | `hotkey` | same as `T`. |
 | `P` | Plain text line, up to 32 characters. | `name` | nothing. |
 | `FL` | File loader: pick a file, it is sent to the core at once. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename` (the default file), optional `autoload` (bool: the file is also sent at core start, if it exists) | `CMD_IOCTL_*` sequence. |
-| `F` | File mounter: mount a disk image. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename` | `CMD_IMG_*`: the core reads and writes 512-byte sectors of the image. |
+| `F` | File mounter: mount a disk image. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename`, optional `physical` (bool: on a board with a floppy connector, Karabas Go, the browser also offers the physical drives) | `CMD_IMG_*`: the core reads and writes 512-byte sectors of the image; `CMD_IMG_PHYS` for a physical drive. |
 
 `default` is the index of the default option. `hotkey` is described below. The key `bits` that appears in some cores' JSON is ignored by `make_core.py`. It only notes how many bits the core decodes.
 
@@ -275,7 +275,7 @@ One item:
 | Size | Field |
 |---|---|
 | 1 | Type: `0` S, `1` N, `2` T, `3` H, `4` P, `5` F, `6` FL |
-| 1 | Reserved |
+| 1 | Flags: bit 0 = `physical` (`F` only), other bits reserved (0) |
 | 16 | Name (`P`: the first 16 characters of the text) |
 | 1 | Default value |
 | | **`F` / `FL`:** |
