@@ -18,12 +18,19 @@
 #   7  1     DownColorsMixed
 #   8  1     number of backgrounds (the highest Bnn + 1; a missing one is colour 0)
 #   9  1     number of rules (up to 16)
-#   10 1     the background shown first (the lowest Bnn there is), 0xFF: none
-#   11 5     0
+#   10 1     the background shown first: the one of the first rule that matches the snapshot, else
+#            the lowest Bnn there is; 0xFF: none
+#   11 2     the rules that match the snapshot (bit n: rule n), the core starts with them (it loads the
+#            RAM before it knows the rules)
+#   13 3     the pages (high bytes) of the tables of reversed bytes in the RAM, 0: none. Games flip
+#            their sprites with T[v] = reverse(v) (LD L,byte / LD A,(HL)); the lanes of the core read
+#            those tables at the address of their own L, every other table at the address of the main
+#            CPU (a mask must be the same in every lane).
 #   16 768   the palette, RGB (NAME.PAL or the standard Spec256 one)
 #   784 64   16 rules: background, address (2), value: background n while the byte at the address is
 #            the value (the "NN: addr=VVh" lines of the .CFG; the first one that matches)
-#   848      131072 the ROM planes (NAME.GFB, the 16K of the 48K ROM), if flag 0
+#   848      131072 the ROM planes (NAME.GFB, the 16K of the 48K ROM), if flag 0; the core reads a word
+#            of 0 as the ROM byte (a .GFB colours the font and leaves the rest 0)
 #   then     49152 per background: the 256x192 paper of the 320x200 picture (x 32..287, y 4..195)
 # The settings and their defaults are those of ZX-Poly / ZxNextEmu (karabas-go-core-spec256
 # docs/SIMD.md, section 7).
@@ -256,6 +263,12 @@ if gfb_filename:
         print(f"{gfb_filename}: ROM graphics are 131072 bytes, got {len(gfb)}")
         exit(1)
     rom_planes = planes(gfb[:131072], 16384)
+    # a .GFB colours a part of the ROM (the font); the rest is 0, which the core reads as the ROM itself.
+    # One that is 0 everywhere (Renegade, Scooby Doo) is left out.
+    if not any(rom_planes):
+        print(f"{gfb_filename}: all 0, not used")
+        rom_planes = None
+        gfb_filename = None
 
 pal_filename = companion(".pal")
 palette = read_palette(pal_filename) if pal_filename else DEFAULT_PALETTE
@@ -273,8 +286,20 @@ down_mixed = cfg.get("DownColorsMixed", 0)
 
 flags = (1 if rom_planes else 0) | (2 if paper00inkff else 0) | (4 if hide_same else 0) | (8 if bk_over_ff else 0)
 o.write(b"K256")
+# the rules against the RAM of the snapshot (4000-FFFF)
+match = 0
+first = min(backgrounds) if backgrounds else 0xFF
+for i, (n, addr, val) in enumerate(rules):
+    if 0x4000 <= addr and sna[addr - 0x4000] == val:
+        if not match:
+            first = n
+        match |= 1 << i
+# the tables of reversed bytes: 256-byte aligned in 4000-FFFF
+REVERSE = bytes(int("{:08b}".format(i)[::-1], 2) for i in range(256))
+pages = [0x40 + p for p in range(192) if sna[p * 256:(p + 1) * 256] == REVERSE][:3]
+pages += [0] * (3 - len(pages))
 o.write(bytes([1, flags, up_mixed & 0xFF, down_mixed & 0xFF, bkg_count, len(rules),
-               min(backgrounds) if backgrounds else 0xFF, 0, 0, 0, 0, 0]))
+               first, match & 0xFF, match >> 8] + pages))
 o.write(palette)
 for i in range(16):
     if i < len(rules):
@@ -292,5 +317,6 @@ o.close()
 
 print(f"palette: {pal_filename or 'standard'}, cfg: {cfg_filename or 'none'}, ROM graphics: {gfb_filename or 'none'}, "
       f"backgrounds: {sorted(backgrounds)}, rules: {len(rules)}")
+print(f"tables of reversed bytes: {['%02X00' % p for p in pages if p]}")
 print(f"Paper00InkFF={int(paper00inkff)} HideSameInkPaper={int(hide_same)} BkOverFF={int(bk_over_ff)} "
       f"UpColorsMixed={up_mixed} DownColorsMixed={down_mixed}")
