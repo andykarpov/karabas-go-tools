@@ -1,7 +1,7 @@
 #!/bin/env python3
 
 #########################################################
-# Karabas Go Spec256 snapshot convertor v1.0            #
+# Karabas Go Spec256 snapshot convertor v1.2            #
 #                                                       #
 # (c) 2026 Andy Karpov <andy.karpov@gmail.com>          #
 #########################################################
@@ -9,11 +9,10 @@
 import argparse
 import sys
 import os
-import numpy as np
 from pathlib import Path
 
 
-msg = "Karabas Go Spec256 snapshot convertor v1.0"
+msg = "Karabas Go Spec256 snapshot convertor v1.2"
 parser = argparse.ArgumentParser(description = msg)
 parser.add_argument('sna_file')
 args = parser.parse_args()
@@ -58,31 +57,22 @@ if gfx_size != 393216:
 print(f"Converting {sna_filename} + {gfx_filename} into {outfile}")
 o = open(outfile, "wb")
 
-# трансформация SNA + GFX в сырую память для загрузки на стороне FPGA
+# область памяти cpu0
 for i in range(49152):
     byte_sna = sna[i]
+    o.write(byte_sna.to_bytes(1, 'big'))
+
+# GFX -> 8 битовых плоскостей (как gfxram_load в GZX): бит k плоскости p = бит p цвета пикселя k.
+# 0x00 и 0xFF - обычные цвета: 0xFF прозрачен только при выводе на экран, не в данных.
+for i in range(49152):
     word_gfx = gfx[i*8:i*8+8]
-    # если все 0 или один из байтов FF - берем за основу байт из sna
-    if word_gfx == bytearray([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]) or 0xFF in word_gfx:
-        byte_res = byte_sna
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-        o.write(byte_res.to_bytes(1, 'big'))
-    else:
-        # формирование битпланов
-        for ctx in range(8):
-            bitmask = 1 << ctx
-            accumulator = 0
-            for k in range(8):
-                byte_gfx = gfx[i*8+k]
-                if byte_gfx & bitmask != 0:
-                    accumulator |= 1 << k;
-            o.write(accumulator.to_bytes(1, 'big'))
+    for ctx in range(8):
+        bitmask = 1 << ctx
+        accumulator = 0
+        for k in range(8):
+            if word_gfx[k] & bitmask != 0:
+                accumulator |= 1 << k
+        o.write(accumulator.to_bytes(1, 'big'))
 
 """
 SNA header:
