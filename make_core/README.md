@@ -53,6 +53,7 @@ The file must be strict JSON: no comments, no trailing commas (`{...},` before `
 | `eeprom_bank` | 0–255 | yes | `0`–`3`: a bank of the on-board 24C08 EEPROM; `4`–`254`: 256 bytes stored inside the core file; `255`: no EEPROM. |
 | `rtc_mode` | 0–3 | no (0) | RTC register model: `0` MC146818A, `1` DS1307, `2` ZX Evolution (MC146818A, always BCD), `3` MSM6242B (Amiga, 13 BCD digits; firmware with MSM6242B support). |
 | `spi_freq` | MHz | no (0) | Clock of the MCU ↔ FPGA SPI link for this core. `0` = default 16 MHz. |
+| `save_dir` | string | no | Dir of the backup RAM files (`.sav`) of a core with backup RAM (caps bit 3, firmware `docs/protocol.md` "Backup RAM"), up to 32 characters. Not set: `<dir>/saves`. |
 | `dir` | string, ≤ 32 | no | `fileloader` cores: initial directory on the SD card. |
 | `extensions` | string, ≤ 32 | no | `fileloader` cores: allowed extensions, comma separated (`.rom,.bin`). |
 | `filename` | string | no | Keep it empty (`""`) or leave it out. The firmware uses this field to store the last selected file. |
@@ -242,7 +243,8 @@ All multi-byte numbers are **big-endian**. Strings are ASCII, padded with spaces
 | 121 | 32 | File loader `filename`. The firmware stores the last selected file here as a 16-bit directory index in bytes 121–122. |
 | 153 | 32 | File loader `extensions` |
 | 185 | 1 | `spi_freq` (MHz, `0` = 16 MHz) |
-| 186 | 70 | Reserved (`FF`) |
+| 186 | 32 | `save_dir`, `FF` when not set |
+| 218 | 38 | Reserved (`FF`) |
 | 256 | 256 | EEPROM data, for `eeprom_bank` 4–254. Written by the firmware. |
 | 512 | 256 | OSD switch values, one byte per OSD item: the defaults, then the values saved by the firmware. |
 | 768 | 256 | Reserved (`00`) |

@@ -72,7 +72,9 @@ o.write(d.dir.ljust(32)[:32].encode('ascii') if hasattr(d, "dir") else b'\x00' *
 o.write(d.filename.ljust(32)[:32].encode('ascii') if hasattr(d, "filename") else b'\x00' * 32) # 32 bytes last selected filename in fileloader mode
 o.write(d.extensions.ljust(32)[:32].encode('ascii') if hasattr(d, "extensions") else b'\x00' * 32) # 32 bytes allowed file extensions (comma separated string) 
 o.write(d.spi_freq.to_bytes(1, 'big') if hasattr(d, "spi_freq") else b'\x00') # spi freq
-o.write(b'\xFF' * 32) # reserved 32 bytes
+# 32 bytes: the dir of the backup RAM files (.sav) of the core (karabas-go-firmware docs/protocol.md "Backup RAM");
+# not set: 0xFF (reserved), the firmware takes <dir>/saves then
+o.write(d.save_dir.ljust(32)[:32].encode('ascii') if hasattr(d, "save_dir") else b'\xFF' * 32)
 o.write(b'\xFF' * 38) # reserved 38 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
