@@ -52,8 +52,9 @@ for rom in d.roms:
 # on-board button actions (karabas-go-firmware, input_tick_buttons):
 # core: press / release go to the core (CMD_BTN), the default
 # none: ignored, osd: toggle the osd, menu: back to the boot core, reload: load the core again,
-# bootsel: reboot the mcu into BOOTSEL, msc: reboot into USB mass storage
-btn_actions = { "core": 0, "none": 1, "osd": 2, "menu": 3, "reload": 4, "bootsel": 5, "msc": 6 }
+# bootsel: reboot the mcu into BOOTSEL, msc: reboot into USB mass storage,
+# msc2: the same with the second SD card (the slot of the FPGA)
+btn_actions = { "core": 0, "none": 1, "osd": 2, "menu": 3, "reload": 4, "bootsel": 5, "msc": 6, "msc2": 7 }
 BUTTONS = 6
 
 def btn_action(name, value):
