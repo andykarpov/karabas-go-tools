@@ -55,6 +55,7 @@ The file must be strict JSON: no comments, no trailing commas (`{...},` before `
 | `spi_freq` | MHz | no (0) | Clock of the MCU ↔ FPGA SPI link for this core. `0` = default 16 MHz. |
 | `save_dir` | string | no | Dir of the backup RAM files (`.sav`) of a core with backup RAM (caps bit 3, firmware `docs/protocol.md` "Backup RAM"), up to 32 characters. Not set: `<dir>/saves`. |
 | `buttons` | object | no | Actions of the on-board buttons, see below. Not set: the button goes to the core. |
+| `matrix` | string / object | no | What the LED matrix shows, see below. Not set: the core draws on it. |
 | `dir` | string, ≤ 32 | no | `fileloader` cores: initial directory on the SD card. |
 | `extensions` | string, ≤ 32 | no | `fileloader` cores: allowed extensions, comma separated (`.rom,.bin`). |
 | `filename` | string | no | Keep it empty (`""`) or leave it out. The firmware uses this field to store the last selected file. |
@@ -97,6 +98,39 @@ With `press` set to `core`, the core gets the press at once and `hold` follows w
     "btn1": "core",
     "btn2": {"press": "core", "hold": "menu", "hold_ms": 3000}
 }
+```
+
+### LED matrix
+
+`matrix` sets what the LED matrix add-on (16x8, red / green / yellow) shows in this core. A value is a mode name, or an object:
+
+| Key | Meaning |
+|---|---|
+| `mode` | `core` (the default): the core draws on the matrix or shows its audio meters; the boot core scrolls `KARABAS GO`. `scroll`: scrolls `text`. `effect`: an animated `effect`. `image`: a picture, or an animation of up to 4 frames. `blank`: off. |
+| `text` | `scroll`: up to 64 ASCII chars. `{name}`, `{build}`, `{time}` (HH:MM) and `{date}` (DD.MM.YYYY) are replaced at the start of each pass. |
+| `color` | `scroll`: `yellow` (the default), `red`, `green`, `rainbow` (by character), `gradient` (by column: green, yellow, red). `effect` `scanner`: `red` (the default), `green`, `yellow`. |
+| `step_ms` | 20–5100 ms: one pixel of the scroll, one step of the effect, one frame of the animation. Default: scroll 100, image 200, effect: its own. |
+| `repeat` | `scroll`: passes of the text, `image`: loops of the animation (with one frame: steps of `step_ms`). Then `then` takes over. `0` (the default): forever. |
+| `then` | After `repeat`: `core` (the default), `effect` or `blank`. |
+| `effect` | `clock` (HH:MM, the seconds run along the bottom row), `fire`, `life` (Conway's Game of Life), `scanner`. |
+| `brightness` | 1–16, default 5. |
+| `image` | One frame: 8 strings of 16 chars, `G` green, `R` red, `Y` yellow, `.` off. |
+| `frames` | Up to 4 such frames, an animation. |
+
+The core draws on the matrix (`CMD_MATRIX_*`) only in the `core` mode, or after `then: core`.
+
+```json
+"matrix": {"mode": "scroll", "text": "NES {build}", "color": "rainbow", "repeat": 2,
+           "then": "effect", "effect": "fire"}
+```
+
+```json
+"matrix": {"mode": "image", "step_ms": 300, "frames": [
+    ["................", "..YYY...........", ".YYYYY..........", ".YYY............",
+     ".YYYYY..........", "..YYY...........", "................", "................"],
+    ["................", "..YYY...........", ".YYYYY..........", ".YYYYY..........",
+     ".YYYYY..........", "..YYY...........", "................", "................"]
+]}
 ```
 
 ### ROMs
@@ -281,7 +315,7 @@ All multi-byte numbers are **big-endian**. Strings are ASCII, padded with spaces
 | 236 | 20 | Reserved (`FF`) |
 | 256 | 256 | EEPROM data, for `eeprom_bank` 4–254. Written by the firmware. |
 | 512 | 256 | OSD switch values, one byte per OSD item: the defaults, then the values saved by the firmware. |
-| 768 | 256 | Reserved (`00`) |
+| 768 | 256 | LED matrix: +0 mode (`0` core, `1` scroll, `2` effect, `3` image, `4` blank), +1 color, +2 `step_ms` / 20 (`0` default), +3 `repeat`, +4 `then`, +5 effect, +6 brightness (`0` default), +7 frame count, +16 text (64), +80 four 32-byte frames (red plane, green plane, 2 bytes per row, bit 7 = left). `00` = core |
 
 ### Bitstream
 

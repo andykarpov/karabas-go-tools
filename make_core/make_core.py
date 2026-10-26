@@ -87,6 +87,91 @@ def buttons_bytes(d):
             out[i + 2] = (hold_ms + 50) // 100
     return bytes(out)
 
+# LED matrix settings (karabas-go-firmware, lib/KarabasCommon kg_matrix.h), 256 bytes at 768:
+# "matrix": "core"
+# "matrix": {"mode": "scroll", "text": "NES {build}", "color": "rainbow", "step_ms": 60,
+#            "repeat": 2, "then": "effect", "effect": "fire", "brightness": 6}
+# "matrix": {"mode": "image", "frames": [["GGGG............", ...8 rows], ...up to 4], "step_ms": 200}
+matrix_modes = { "core": 0, "scroll": 1, "effect": 2, "image": 3, "blank": 4 }
+matrix_then = { "core": 0, "effect": 2, "blank": 4 }
+matrix_colors = { "default": 0, "red": 1, "green": 2, "yellow": 3, "rainbow": 4, "gradient": 5 }
+matrix_effects = { "clock": 0, "fire": 1, "life": 2, "scanner": 3 }
+MATRIX_TEXT_LEN = 64
+MATRIX_FRAMES = 4
+
+def matrix_fail(msg):
+    print("matrix: " + msg)
+    exit(1)
+
+def matrix_choice(table, key, value):
+    if value not in table:
+        matrix_fail("unknown %s '%s', expected one of %s" % (key, value, ", ".join(table)))
+    return table[value]
+
+# 16x8 rows of G (green), R (red), Y (yellow), . or space (off) -> red plane, green plane
+def matrix_frame(n, rows):
+    if not isinstance(rows, list) or len(rows) != 8:
+        matrix_fail("frame %d must have 8 rows" % n)
+    out = bytearray(32)
+    for y, row in enumerate(rows):
+        if not isinstance(row, str) or len(row) != 16:
+            matrix_fail("row %d of frame %d must have 16 chars" % (y, n))
+        for x, c in enumerate(row):
+            if c not in "GRY. ":
+                matrix_fail("frame %d row %d: unknown pixel '%s', expected G, R, Y or ." % (n, y, c))
+            bit = 0x80 >> (x % 8)
+            if c in "RY":
+                out[y * 2 + x // 8] |= bit
+            if c in "GY":
+                out[16 + y * 2 + x // 8] |= bit
+    return out
+
+def matrix_bytes(d):
+    out = bytearray(256)
+    if not hasattr(d, "matrix"):
+        return bytes(out)
+    m = d.matrix
+    if isinstance(m, str):
+        m = SimpleNamespace(mode = m)
+    mode = matrix_choice(matrix_modes, "mode", getattr(m, "mode", "core"))
+    out[0] = mode
+    out[1] = matrix_choice(matrix_colors, "color", getattr(m, "color", "default"))
+    if hasattr(m, "step_ms"):
+        if not 20 <= m.step_ms <= 5100:
+            matrix_fail("step_ms must be 20..5100")
+        out[2] = (m.step_ms + 10) // 20
+    repeat = getattr(m, "repeat", 0)
+    if not 0 <= repeat <= 255:
+        matrix_fail("repeat must be 0..255")
+    out[3] = repeat
+    out[4] = matrix_choice(matrix_then, "then", getattr(m, "then", "core"))
+    effect = getattr(m, "effect", None)
+    if effect is None and (mode == matrix_modes["effect"] or out[4] == matrix_modes["effect"]):
+        matrix_fail("effect is not set")
+    out[5] = matrix_choice(matrix_effects, "effect", effect) if effect is not None else 0
+    if hasattr(m, "brightness"):
+        if not 1 <= m.brightness <= 16:
+            matrix_fail("brightness must be 1..16")
+        out[6] = m.brightness
+    text = getattr(m, "text", "")
+    if len(text) > MATRIX_TEXT_LEN or not all(0x20 <= ord(c) < 0x7F for c in text):
+        matrix_fail("text must be up to %d ASCII chars" % MATRIX_TEXT_LEN)
+    if mode == matrix_modes["scroll"] and text == "":
+        matrix_fail("text is not set")
+    out[16:16 + len(text)] = text.encode("ascii")
+    frames = getattr(m, "frames", None)
+    if hasattr(m, "image"):
+        frames = [m.image]
+    if mode == matrix_modes["image"] and not frames:
+        matrix_fail("image or frames is not set")
+    if frames:
+        if len(frames) > MATRIX_FRAMES:
+            matrix_fail("up to %d frames" % MATRIX_FRAMES)
+        out[7] = len(frames)
+        for n, rows in enumerate(frames):
+            out[80 + n * 32:80 + (n + 1) * 32] = matrix_frame(n, rows)
+    return bytes(out)
+
 o = open(outfile, "wb")
 
 # header block
@@ -121,7 +206,8 @@ o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
     o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00')
 o.write(b'\x00' * (256 - len(d.osd))) # switches 256 bytes
-o.write(b'\x00' * 256) # reserved 256 bytes
+# 256 bytes: the LED matrix settings, see matrix_bytes()
+o.write(matrix_bytes(d))
 
 # bitstream block
 o.write(bitstream)
