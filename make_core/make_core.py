@@ -95,7 +95,7 @@ def buttons_bytes(d):
 matrix_modes = { "core": 0, "scroll": 1, "effect": 2, "image": 3, "blank": 4 }
 matrix_then = { "core": 0, "effect": 2, "blank": 4 }
 matrix_colors = { "default": 0, "red": 1, "green": 2, "yellow": 3, "rainbow": 4, "gradient": 5 }
-matrix_effects = { "clock": 0, "fire": 1, "life": 2, "scanner": 3 }
+matrix_effects = { "clock": 0, "fire": 1, "life": 2, "scanner": 3, "rain": 4, "plasma": 5, "stars": 6, "pong": 7, "drive": 8 }
 MATRIX_TEXT_LEN = 64
 MATRIX_FRAMES = 4
 

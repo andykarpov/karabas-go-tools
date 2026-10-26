@@ -112,7 +112,7 @@ With `press` set to `core`, the core gets the press at once and `hold` follows w
 | `step_ms` | 20–5100 ms: one pixel of the scroll, one step of the effect, one frame of the animation. Default: scroll 100, image 200, effect: its own. |
 | `repeat` | `scroll`: passes of the text, `image`: loops of the animation (with one frame: steps of `step_ms`). Then `then` takes over. `0` (the default): forever. |
 | `then` | After `repeat`: `core` (the default), `effect` or `blank`. |
-| `effect` | `clock` (HH:MM, the seconds run along the bottom row), `fire`, `life` (Conway's Game of Life), `scanner`. |
+| `effect` | `clock` (HH:MM, the seconds run along the bottom row), `fire`, `life` (Conway's Game of Life), `scanner`, `rain`, `plasma`, `stars`, `pong`, `drive` (the mounted disk images: a dot lit on an access, green read / red write, and the head position over the image in yellow). |
 | `brightness` | 1–16, default 5. |
 | `image` | One frame: 8 strings of 16 chars, `G` green, `R` red, `Y` yellow, `.` off. |
 | `frames` | Up to 4 such frames, an animation. |
