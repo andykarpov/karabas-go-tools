@@ -49,6 +49,44 @@ rom_size = 0
 for rom in d.roms:
     rom_size = rom_size + len(rom_payload(rom))
 
+# on-board button actions (karabas-go-firmware, input_tick_buttons):
+# core: press / release go to the core (CMD_BTN), the default
+# none: ignored, osd: toggle the osd, menu: back to the boot core, reload: load the core again,
+# bootsel: reboot the mcu into BOOTSEL, msc: reboot into USB mass storage
+btn_actions = { "core": 0, "none": 1, "osd": 2, "menu": 3, "reload": 4, "bootsel": 5, "msc": 6 }
+BUTTONS = 6
+
+def btn_action(name, value):
+    if value not in btn_actions:
+        print("Unknown action '%s' of button %s, expected one of %s" % (value, name, ", ".join(btn_actions)))
+        exit(1)
+    return btn_actions[value]
+
+# "buttons": {"btn1": "core", "btn2": {"press": "osd", "hold": "menu", "hold_ms": 3000}}
+# 3 bytes per button: press action, hold action, hold time in 100 ms units; 0xFF = not set
+# (press: core, no hold)
+def buttons_bytes(d):
+    out = bytearray(b'\xFF' * (3 * BUTTONS))
+    buttons = vars(d.buttons) if hasattr(d, "buttons") else {}
+    for name, b in buttons.items():
+        if not name.startswith("btn") or not name[3:].isdigit() or not 1 <= int(name[3:]) <= BUTTONS:
+            print("Unknown button '%s', expected btn1..btn%d" % (name, BUTTONS))
+            exit(1)
+        i = (int(name[3:]) - 1) * 3
+        if isinstance(b, str):
+            out[i] = btn_action(name, b)
+            continue
+        if hasattr(b, "press"):
+            out[i] = btn_action(name, b.press)
+        if hasattr(b, "hold"):
+            hold_ms = getattr(b, "hold_ms", 2000)
+            if not 100 <= hold_ms <= 25400:
+                print("hold_ms of button %s must be 100..25400" % name)
+                exit(1)
+            out[i + 1] = btn_action(name, b.hold)
+            out[i + 2] = (hold_ms + 50) // 100
+    return bytes(out)
+
 o = open(outfile, "wb")
 
 # header block
@@ -75,7 +113,10 @@ o.write(d.spi_freq.to_bytes(1, 'big') if hasattr(d, "spi_freq") else b'\x00') # 
 # 32 bytes: the dir of the backup RAM files (.sav) of the core (karabas-go-firmware docs/protocol.md "Backup RAM");
 # not set: 0xFF (reserved), the firmware takes <dir>/saves then
 o.write(d.save_dir.ljust(32)[:32].encode('ascii') if hasattr(d, "save_dir") else b'\xFF' * 32)
-o.write(b'\xFF' * 38) # reserved 38 bytes
+# 6 x 3 bytes: the on-board buttons (btn1, btn2; btn3..btn6 reserved for the Mini G extra buttons),
+# see buttons_bytes()
+o.write(buttons_bytes(d))
+o.write(b'\xFF' * 20) # reserved 20 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
     o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00')
