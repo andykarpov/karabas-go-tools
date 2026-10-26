@@ -90,6 +90,7 @@ Actions:
 | `reload` | Loads the core again (hard reset). |
 | `bootsel` | Reboots the MCU into BOOTSEL (firmware update). |
 | `msc` | Reboots into USB mass storage (the SD card on the PC). |
+| `msc2` | The same with the second SD card (the slot of the FPGA). |
 
 With `press` set to `core`, the core gets the press at once and `hold` follows while the button is still held. With another `press`, a short press runs `press` on the release and a hold runs only `hold`.
 
@@ -311,7 +312,7 @@ All multi-byte numbers are **big-endian**. Strings are ASCII, padded with spaces
 | 153 | 32 | File loader `extensions` |
 | 185 | 1 | `spi_freq` (MHz, `0` = 16 MHz) |
 | 186 | 32 | `save_dir`, `FF` when not set |
-| 218 | 18 | Buttons `btn1`..`btn6`, 3 bytes each: `press`, `hold` (actions: `0` core, `1` none, `2` osd, `3` menu, `4` reload, `5` bootsel, `6` msc), `hold_ms` / 100. `FF` = not set (`press`: core, no `hold`) |
+| 218 | 18 | Buttons `btn1`..`btn6`, 3 bytes each: `press`, `hold` (actions: `0` core, `1` none, `2` osd, `3` menu, `4` reload, `5` bootsel, `6` msc, `7` msc2), `hold_ms` / 100. `FF` = not set (`press`: core, no `hold`) |
 | 236 | 20 | Reserved (`FF`) |
 | 256 | 256 | EEPROM data, for `eeprom_bank` 4–254. Written by the firmware. |
 | 512 | 256 | OSD switch values, one byte per OSD item: the defaults, then the values saved by the firmware. |
