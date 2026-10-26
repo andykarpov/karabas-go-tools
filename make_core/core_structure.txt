@@ -21,7 +21,7 @@ Offset             | N of Bytes | Description
 121                | 32         | Last selected filename in fileloader mode (writable by firmware to store last selected file)
 153                | 32         | Allowed fileloader file extensions (comma separated)
 185                | 1          | Core SPI frequency (0 = default)
-186                | 32         | Reserved
+186                | 32         | Save dir of the backup RAM files (.sav), FF = not set (<dir>/saves)
 218                | 38         | Reserved
 256                | 256        | EEPROM Data (writable block by firmware in case of EEPROM bank > 3)
 512                | 256        | OSD Switches Data (writable block by firmware)
