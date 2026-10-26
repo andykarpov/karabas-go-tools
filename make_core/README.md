@@ -54,6 +54,7 @@ The file must be strict JSON: no comments, no trailing commas (`{...},` before `
 | `rtc_mode` | 0–3 | no (0) | RTC register model: `0` MC146818A, `1` DS1307, `2` ZX Evolution (MC146818A, always BCD), `3` MSM6242B (Amiga, 13 BCD digits; firmware with MSM6242B support). |
 | `spi_freq` | MHz | no (0) | Clock of the MCU ↔ FPGA SPI link for this core. `0` = default 16 MHz. |
 | `save_dir` | string | no | Dir of the backup RAM files (`.sav`) of a core with backup RAM (caps bit 3, firmware `docs/protocol.md` "Backup RAM"), up to 32 characters. Not set: `<dir>/saves`. |
+| `buttons` | object | no | Actions of the on-board buttons, see below. Not set: the button goes to the core. |
 | `dir` | string, ≤ 32 | no | `fileloader` cores: initial directory on the SD card. |
 | `extensions` | string, ≤ 32 | no | `fileloader` cores: allowed extensions, comma separated (`.rom,.bin`). |
 | `filename` | string | no | Keep it empty (`""`) or leave it out. The firmware uses this field to store the last selected file. |
@@ -66,6 +67,37 @@ Core types:
 - **`osd`**: a normal core. The OSD menu opens with `Menu+Esc`.
 - **`fileloader`**: the OSD opens at start with a file browser over `dir` / `extensions`. The selected file is sent to the core with the file loader commands. `Menu+Esc` opens the browser again.
 - **any other value**: no OSD at all.
+
+### Buttons
+
+`buttons` sets what the on-board buttons do in this core. Keys `btn1`, `btn2` (`btn3`..`btn6` are reserved for the extra buttons of the Karabas Mini G). A value is an action name, or an object:
+
+| Key | Meaning |
+|---|---|
+| `press` | Action of a press. Default `core`. |
+| `hold` | Action of a hold of `hold_ms`. Default: none. |
+| `hold_ms` | 100–25400 ms, default 2000. |
+
+Actions:
+
+| Action | Meaning |
+|---|---|
+| `core` | The press and the release go to the core (`CMD_BTN`); the core decides (reset, NMI...). |
+| `none` | Ignored. |
+| `osd` | Opens / closes the OSD menu. |
+| `menu` | Back to the boot menu. |
+| `reload` | Loads the core again (hard reset). |
+| `bootsel` | Reboots the MCU into BOOTSEL (firmware update). |
+| `msc` | Reboots into USB mass storage (the SD card on the PC). |
+
+With `press` set to `core`, the core gets the press at once and `hold` follows while the button is still held. With another `press`, a short press runs `press` on the release and a hold runs only `hold`.
+
+```json
+"buttons": {
+    "btn1": "core",
+    "btn2": {"press": "core", "hold": "menu", "hold_ms": 3000}
+}
+```
 
 ### ROMs
 
@@ -213,6 +245,7 @@ The boot core (`boot.kg*`, not listed itself):
     "type": "boot",
     "order": 1,
     "eeprom_bank": 0,
+    "buttons": {"btn1": "bootsel", "btn2": "msc"},
     "roms": [],
     "osd": [
         {"type": "T", "name": "Reset", "options": null, "default": 0, "hotkey": "Ctrl+Alt+Del"}
@@ -244,7 +277,8 @@ All multi-byte numbers are **big-endian**. Strings are ASCII, padded with spaces
 | 153 | 32 | File loader `extensions` |
 | 185 | 1 | `spi_freq` (MHz, `0` = 16 MHz) |
 | 186 | 32 | `save_dir`, `FF` when not set |
-| 218 | 38 | Reserved (`FF`) |
+| 218 | 18 | Buttons `btn1`..`btn6`, 3 bytes each: `press`, `hold` (actions: `0` core, `1` none, `2` osd, `3` menu, `4` reload, `5` bootsel, `6` msc), `hold_ms` / 100. `FF` = not set (`press`: core, no `hold`) |
+| 236 | 20 | Reserved (`FF`) |
 | 256 | 256 | EEPROM data, for `eeprom_bank` 4–254. Written by the firmware. |
 | 512 | 256 | OSD switch values, one byte per OSD item: the defaults, then the values saved by the firmware. |
 | 768 | 256 | Reserved (`00`) |
