@@ -42,7 +42,9 @@ Offset             | N of Bytes | Description
                                         3 - hidden trigger (H in json), 
                                         4 - plain text line (P in json),
                                         5 - file mounter (F in json),
-                                        6 - file loader (FL in json)
+                                        6 - file loader (FL in json),
+                                        7 - page entry (M in json, default value = the page it opens),
+                                        8 - separator (- in json)
                                   )
 1034+B+R           | 1          | Reserved
 1050+B+R           | 16         | Parameter Name
@@ -54,5 +56,7 @@ Offset             | N of Bytes | Description
 ...
 1100+B+R           | 16         | Hotkey description (or second 16 bytes of text line)
 1116+B+R           | 2          | Hotkey keycodes
-1119+B+R           | 3          | Reserved
+1119+B+R           | 1          | Page of the item (0 = main menu)
+1120+B+R           | 1          | Condition item index + 1 (0 = none)
+1121+B+R           | 1          | Condition: bit 7 disable (else hide), bit 6 invert, bits 0-5 value
 

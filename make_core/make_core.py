@@ -173,6 +173,91 @@ def matrix_bytes(d):
             out[80 + n * 32:80 + (n + 1) * 32] = matrix_frame(n, rows)
     return bytes(out)
 
+# OSD item types; M (a page entry: opens the items of its page) and - (a separator line) are
+# shown as plain rows by firmware older than the tree menus
+osd_types = { "S": 0, "N": 1, "T": 2, "H": 3, "P": 4, "F": 5, "FL": 6, "M": 7, "-": 8 }
+MAX_OSD_ITEMS = 64    # the firmware reads at most 64 items (older firmware: 32)
+MAX_OSD_OPTIONS = 16  # and 16 options of an item (older firmware: 8)
+COND_VALUE_MAX = 63
+
+def osd_fail(i, osd, msg):
+    print("OSD item %d (%s): %s" % (i, getattr(osd, "name", osd.type), msg))
+    exit(1)
+
+# the item a condition names: its index, or its name (unique)
+def osd_find(i, osd, ref):
+    if isinstance(ref, int):
+        if 0 <= ref < len(d.osd): return ref
+        osd_fail(i, osd, "condition item %d does not exist" % ref)
+    found = [j for j, o in enumerate(d.osd) if getattr(o, "name", None) == ref]
+    if len(found) != 1:
+        osd_fail(i, osd, "condition item '%s': %s" % (ref, "not found" if not found else "the name is not unique"))
+    return found[0]
+
+# the pages: every page an item is on is opened by exactly one M item, and its parents lead to the
+# main page (0) without a loop
+def osd_check_tree():
+    opens = {}
+    for i, osd in enumerate(d.osd):
+        if osd.type not in osd_types:
+            osd_fail(i, osd, "unknown type '%s'" % osd.type)
+        page = getattr(osd, "page", 0)
+        if not isinstance(page, int) or not 0 <= page <= 255:
+            osd_fail(i, osd, "page must be 0..255")
+        if osd.type == 'M':
+            p = getattr(osd, "open", None)
+            if not isinstance(p, int) or not 1 <= p <= 255:
+                osd_fail(i, osd, "a page entry needs \"open\": 1..255")
+            if p in opens:
+                osd_fail(i, osd, "page %d is opened by item %d too" % (p, opens[p]))
+            opens[p] = i
+        if hasattr(osd, "options") and osd.options and len(osd.options) > MAX_OSD_OPTIONS:
+            print("Warning: OSD item %d has %d options, the firmware shows %d" % (i, len(osd.options), MAX_OSD_OPTIONS))
+    for i, osd in enumerate(d.osd):
+        page = getattr(osd, "page", 0)
+        seen = set()
+        while page != 0:
+            if page not in opens:
+                osd_fail(i, osd, "page %d is not opened by any M item" % page)
+            if page in seen:
+                osd_fail(i, osd, "the pages make a loop")
+            seen.add(page)
+            page = getattr(d.osd[opens[page]], "page", 0)
+    if len(d.osd) > MAX_OSD_ITEMS:
+        print("Warning: %d OSD items, the firmware reads %d" % (len(d.osd), MAX_OSD_ITEMS))
+
+# 3 bytes after the hotkey: the page of the item (0 main), the condition item + 1 (0 none), the
+# condition: bit 7 disable (else hide), bit 6 invert, bits 0-5 the value. The item is shown /
+# enabled when (the value of the condition item == value) xor invert.
+def osd_tree_bytes(i, osd):
+    page = getattr(osd, "page", 0)
+    cond = getattr(osd, "show_if", None)
+    disable = False
+    if hasattr(osd, "enable_if"):
+        if cond is not None:
+            osd_fail(i, osd, "show_if and enable_if together")
+        cond = osd.enable_if
+        disable = True
+    if cond is None:
+        return bytes([page, 0, 0])
+    j = osd_find(i, osd, cond.item)
+    if j == i:
+        osd_fail(i, osd, "a condition on the item itself")
+    other = d.osd[j]
+    if other.type not in ('S', 'N') or not getattr(other, "options", None):
+        osd_fail(i, osd, "the condition item %d is not a switch with options" % j)
+    value = cond.value
+    if isinstance(value, str):
+        if value not in other.options:
+            osd_fail(i, osd, "'%s' is not an option of item %d" % (value, j))
+        value = other.options.index(value)
+    if not 0 <= value <= COND_VALUE_MAX or value >= len(other.options):
+        osd_fail(i, osd, "condition value %d out of range" % value)
+    flags = (0x80 if disable else 0) | (0x40 if getattr(cond, "not", False) else 0) | value
+    return bytes([page, j + 1, flags])
+
+osd_check_tree()
+
 o = open(outfile, "wb")
 
 # header block
@@ -205,7 +290,7 @@ o.write(buttons_bytes(d))
 o.write(b'\xFF' * 20) # reserved 20 bytes
 o.write(b'\xFF' * 256) # eeprom 256 bytes
 for osd in d.osd: # write defaults to switches
-    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00')
+    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") and osd.type != 'M' else b'\x00')
 o.write(b'\x00' * (256 - len(d.osd))) # switches 256 bytes
 # 256 bytes: the LED matrix settings, see matrix_bytes()
 o.write(matrix_bytes(d))
@@ -268,13 +353,14 @@ def parse_hotkey(value):
 
 # osd
 o.write(len(d.osd).to_bytes(1, 'big')) # count of osd parameters
-for osd in d.osd:
-    o.write(b'\x00' if osd.type == 'S' else b'\x01' if osd.type == 'N' else b'\x02' if osd.type == 'T' else b'\x03' if osd.type == 'H' else b'\x04' if osd.type == 'P' else b'\x05' if osd.type =='F' else b'\x06' if osd.type == 'FL' else b'\xFF') # parameter type
+for i, osd in enumerate(d.osd):
+    o.write(osd_types[osd.type].to_bytes(1, 'big') if osd.type in osd_types else b'\xFF') # parameter type
     # flags: bit 0 = an F item that can be a physical floppy drive ("physical": 1, Karabas Go)
     flags = 1 if osd.type == 'F' and getattr(osd, "physical", 0) else 0
     o.write(flags.to_bytes(1, 'big'))
-    o.write(osd.name.ljust(16)[:16].encode("ascii")) # option name
-    o.write(osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00') # default value
+    o.write(getattr(osd, "name", "").ljust(16)[:16].encode("ascii")) # option name
+    # default value; a page entry (M): the page it opens
+    o.write(osd.open.to_bytes(1, 'big') if osd.type == 'M' else osd.default.to_bytes(1, 'big') if hasattr(osd, "default") else b'\x00')
     
     # file mounter struct
     if osd.type=='F' or osd.type=='FL':
@@ -298,10 +384,12 @@ for osd in d.osd:
     # hotkey or second line of text
     if (osd.type == 'P'):
         o.write(osd.name.ljust(32)[16:32].encode("ascii")) # second part of text line as hotkey
+    elif osd.type in ('M', '-'):
+        o.write(b' ' * 16) # no hotkey
     else:
         o.write(osd.hotkey.ljust(16)[:16].encode("ascii") if hasattr(osd, "hotkey") else "                ".encode("ascii")) # option hotkey
-    o.write(parse_hotkey(osd.hotkey) if hasattr(osd, "hotkey") else b'\x00' * 2) # option keycodes (parsed)
-    o.write(b'\x00'*3) # reserved
+    o.write(parse_hotkey(osd.hotkey) if hasattr(osd, "hotkey") and osd.type not in ('M', '-') else b'\x00' * 2) # option keycodes (parsed)
+    o.write(osd_tree_bytes(i, osd)) # the page and the condition of the item (0 0 0: main page, always shown)
 
 #print(d.name, d.build)
 #print(bitstream_size, rom_size)
