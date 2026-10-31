@@ -176,6 +176,8 @@ Every item can have:
 - `"page": n` (0–255, default 0 = the main menu): the item is on page `n`. A page is opened by the `M` item with `"open": n`, which is itself on some page, so pages can nest. `make_core.py` stops on a page no `M` opens, a page opened twice or a loop.
 - `"show_if"` or `"enable_if"`: `{"item": <index or unique name>, "value": <option index (0–63) or name>, "not": true|false}`. The item is shown (`show_if`) or can be chosen (`enable_if`, else drawn grey) when the switch `item` (an `S` / `N` with options) has `value`, or has not with `"not": true`.
 
+In the menu an `M` item shows `►` in the value column: Enter / Right opens its page, Esc goes back. A sub-page has its path as the title (`◄ Video > Advanced`). A separator is a grey line, an item whose `enable_if` is not met is grey and the cursor skips it, an item whose `show_if` is not met is not shown. Long pages scroll.
+
 The index of an item stays its position in the flat array, whatever its page: to turn a flat menu into a tree without changing the core, keep the items in order, add `page`, and append the `M` items at the end. Hotkeys work on any page. Firmware older than the tree menus shows all items in one list, the `M` and `-` items as plain rows.
 
 ```json
