@@ -157,15 +157,34 @@ Every item has a `type` and a `name`, at most 16 characters (a text line: 32). T
 
 | `type` | Item | Keys | What the core gets |
 |---|---|---|---|
-| `S` | Switch: a value from a list, saved in the core file. | `options` (≤ 8 strings, ≤ 16 chars), `default`, `hotkey` | `CMD_SWITCHES (index, value)` at load and on change. |
+| `S` | Switch: a value from a list, saved in the core file. | `options` (≤ 16 strings, ≤ 16 chars; firmware before the tree menus shows 8), `default`, `hotkey` | `CMD_SWITCHES (index, value)` at load and on change. |
 | `N` | Non-volatile switch: like `S`, but the value is not saved. | same as `S` | same. |
 | `T` | Trigger: a button. | `hotkey` (`options: null`, `default: 0`) | `CMD_SWITCHES (index, 1)`, then `(index, 0)` 100 ms later. |
 | `H` | Hidden trigger: like `T`, not shown in the menu. | `hotkey` | same as `T`. |
 | `P` | Plain text line, up to 32 characters. | `name` | nothing. |
 | `FL` | File loader: pick a file, it is sent to the core at once. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename` (the default file), optional `autoload` (bool: the file is also sent at core start, if it exists) | `CMD_IOCTL_*` sequence. |
+| `M` | Page entry: opens the items of page `open` (a sub-menu). | `open` (1–255, one `M` per page) | nothing. |
+| `-` | Separator: a line. | — | nothing. |
 | `F` | File mounter: mount a disk image. | `slot` (0–7), `extensions`, `hotkey`, optional `dir` / `filename`, optional `physical` (bool: on a board with a floppy connector, Karabas Go, the browser also offers the physical drives) | `CMD_IMG_*`: the core reads and writes 512-byte sectors of the image; `CMD_IMG_PHYS` for a physical drive. |
 
-`default` is the index of the default option. `hotkey` is described below. The key `bits` that appears in some cores' JSON is ignored by `make_core.py`. It only notes how many bits the core decodes.
+`default` is the index of the default option. `hotkey` is described below. Up to 64 items (firmware before the tree menus reads 32).
+
+### Sub-menus (pages) and conditional items
+
+Every item can have:
+
+- `"page": n` (0–255, default 0 = the main menu): the item is on page `n`. A page is opened by the `M` item with `"open": n`, which is itself on some page, so pages can nest. `make_core.py` stops on a page no `M` opens, a page opened twice or a loop.
+- `"show_if"` or `"enable_if"`: `{"item": <index or unique name>, "value": <option index (0–63) or name>, "not": true|false}`. The item is shown (`show_if`) or can be chosen (`enable_if`, else drawn grey) when the switch `item` (an `S` / `N` with options) has `value`, or has not with `"not": true`.
+
+The index of an item stays its position in the flat array, whatever its page: to turn a flat menu into a tree without changing the core, keep the items in order, add `page`, and append the `M` items at the end. Hotkeys work on any page. Firmware older than the tree menus shows all items in one list, the `M` and `-` items as plain rows.
+
+```json
+{"type": "S", "name": "Scanlines", "options": ["Off", "25%", "50%"], "default": 0, "page": 1},
+{"type": "S", "name": "Scan color", "options": ["White", "Amber"], "default": 0, "page": 1,
+ "enable_if": {"item": "Scanlines", "value": "Off", "not": true}},
+{"type": "-"},
+{"type": "M", "name": "Video", "open": 1}
+``` The key `bits` that appears in some cores' JSON is ignored by `make_core.py`. It only notes how many bits the core decodes.
 
 ### Hotkeys
 
@@ -345,21 +364,23 @@ One item:
 
 | Size | Field |
 |---|---|
-| 1 | Type: `0` S, `1` N, `2` T, `3` H, `4` P, `5` F, `6` FL |
+| 1 | Type: `0` S, `1` N, `2` T, `3` H, `4` P, `5` F, `6` FL, `7` M, `8` separator |
 | 1 | Flags: bit 0 = `physical` (`F` only), other bits reserved (0) |
 | 16 | Name (`P`: the first 16 characters of the text) |
-| 1 | Default value |
+| 1 | Default value (`M`: the page it opens) |
 | | **`F` / `FL`:** |
 | 1 | Slot (bits 0–6), autoload flag (bit 7) |
 | 256 | Extensions |
 | 256 | Directory, padded with NULs. The firmware writes the last directory here. |
 | 256 | File name, padded with NULs. The firmware writes the last file here. |
 | | **other types:** |
-| 1 | Number of options `n` (the firmware reads at most 8) |
+| 1 | Number of options `n` (the firmware reads at most 16, before the tree menus 8) |
 | 16 × n | Option names |
 | | **all types:** |
 | 16 | Hotkey text (`P`: characters 17–32 of the text) |
 | 2 | Hotkey codes: modifier mask (Ctrl `11`, Shift `22`, Alt `44`, Menu `88`, OR-ed), USB HID key code |
-| 3 | Reserved |
+| 1 | Page of the item (0 = the main menu) |
+| 1 | Condition: the index + 1 of the switch it depends on, 0 = none |
+| 1 | Condition: bit 7 disable (else hide), bit 6 invert, bits 0–5 the value. Shown / enabled when (the switch's value == value) xor invert |
 
 Each item's default is also written to its byte at offset 512 + index.
