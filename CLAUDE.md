@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Development tools for the Karabas Go / Mini / Mini G cores, plain Python 3 scripts with no dependencies outside the standard library:
 
 - `make_core/make_core.py` packs a core file (`.kg1` Go, `.kg2` Mini, `.kg3` Mini G): the FPGA bitstream, the ROMs, the OSD menu and the core settings, from a JSON description (`core.json`, `core_mini.json`, `core_minig.json`). Usage: `python3 make_core.py <core.json> <output file>`, run from the dir the JSON's paths are relative to (a core's `src/`). Documentation: `make_core/README.md` and `README.ru.md` (the `core.json` reference and the file format).
+- `docs/kgo2.md`: the draft of the next core file format (kgo2, `.kg`: one file for all boards, the user's state in `/config/<id>.ini` on the SD card, item / option keys and RTL numbers). Not implemented yet; its Steps section is the plan.
 - `spec256/spec256.py` converts Spec256 / EmuZWin 256-colour games into the `.256` files of `karabas-go-core-spec256`. Documentation: `spec256/README.md`, `spec256/EZX.md`. The format is defined by this script and the loader of the core (`src/rtl/spec256.vhd`): a change goes into both.
 
 ## Related repositories (siblings in `..`)
