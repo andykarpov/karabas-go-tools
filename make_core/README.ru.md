@@ -53,6 +53,20 @@ python3 kg_dump.py msx.kg                              # что лежит в ф
 Ключи `core.json` для kgo2 (`boards`, `key`, `index`, опции-объекты, `loader`, кандидаты `file`,
 `readonly`) описаны в docs/kgo2.md.
 
+Перевод ядра на kgo2:
+
+```sh
+python3 merge_boards.py go=core.json mini=core_mini.json minig=core_minig.json -o core_all.json
+python3 make_core.py core_all.json msx.kg
+python3 kg_compare.py msx.kg3 msx.kg --board minig   # прошивка получает то же самое?
+python3 kg1_to_json.py pong.kg1 pong/                 # ядро без исходников: обратно в core.json
+```
+
+`merge_boards.py` выносит наверх ключи, одинаковые на всех платах, остальное — в `boards`, и
+выравнивает пункты OSD так, что список каждой платы остаётся прежним (те же номера switch).
+`kg_compare.py` сравнивает файл kgo1 с одной платой файла kgo2 (или два файла одного формата):
+битстрим, ROM, поля ядра, загрузчик, кнопки, матрицу и каждый пункт OSD — как их читает прошивка.
+
 ## Справочник по core.json
 
 Файл должен быть строгим JSON: без комментариев и без висячих запятых (`{...},` перед `]`).

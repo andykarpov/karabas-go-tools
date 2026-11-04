@@ -462,11 +462,12 @@ def kg2_merge(base, over):
 def kg2_ns(obj):
     return json.loads(json.dumps(obj), object_hook = lambda x: SimpleNamespace(**x))
 
-# extensions: a list (["dsk", "img"]) or the kgo1 string (".dsk,.img") -> "dsk,img"
+# extensions: a list (["dsk", "img"]) or the kgo1 string (".dsk,.img", ".img .vhd": commas,
+# semicolons or spaces, as the firmware reads it) -> "dsk,img"
 def kg2_exts(where, exts):
     if exts is None:
         return ""
-    items = exts if isinstance(exts, list) else exts.split(',')
+    items = exts if isinstance(exts, list) else re.split(r'[,;\s]+', exts)
     out = []
     for e in items:
         e = e.strip().lstrip('.')
@@ -517,7 +518,7 @@ def kg2_core(cfg, strings):
     kg2_ascii("id", cfg["id"], 32)
     kg2_ascii("name", cfg["name"], 32)
     kg2_ascii("build", cfg["build"], 8)
-    types = { "boot": 0, "osd": 1, "fileloader": 2, "hidden": 255 }
+    types = { "boot": 0, "osd": 1, "fileloader": 2, "hidden": 255, "none": 255 } # "none": kgo1 writes FF for it
     if cfg["type"] not in types:
         fail("unknown type '%s', expected one of %s" % (cfg["type"], ", ".join(types)))
     def byte(k, default):

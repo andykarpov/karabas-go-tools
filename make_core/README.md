@@ -53,6 +53,21 @@ python3 kg_dump.py msx.kg                              # what the file holds
 The `core.json` keys of kgo2 (`boards`, `key`, `index`, option objects, `loader`, `file`
 candidates, `readonly`) are described in docs/kgo2.md.
 
+Converting a core to kgo2:
+
+```sh
+python3 merge_boards.py go=core.json mini=core_mini.json minig=core_minig.json -o core_all.json
+python3 make_core.py core_all.json msx.kg
+python3 kg_compare.py msx.kg3 msx.kg --board minig   # what the firmware gets: the same?
+python3 kg1_to_json.py pong.kg1 pong/                 # a core without sources: back to core.json
+```
+
+`merge_boards.py` puts the keys equal on all boards at the top and the rest in `boards`, and
+aligns the OSD items so that the list of each board stays its old list (the same switch numbers).
+`kg_compare.py` compares a kgo1 file with one board of a kgo2 file (or two files of a format):
+bitstream, ROMs, the core fields, loader, buttons, matrix and every OSD item, as the firmware
+reads them.
+
 ## core.json reference
 
 The file must be strict JSON: no comments, no trailing commas (`{...},` before `]`).
