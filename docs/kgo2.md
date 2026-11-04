@@ -1,6 +1,7 @@
 # Core file format kgo2 (`.kg`)
 
-Status: **draft**, agreed in outline (2026-11-04), not implemented. It replaces the older sketch
+Status: **draft**, agreed in outline (2026-11-04). make_core writes it (step 1); no firmware reads
+it yet. It replaces the older sketch
 `make_core/core_structure_v2.txt`. The current format, kgo1 (`.kg1` / `.kg2` / `.kg3`), is described
 in [make_core/README.md](../make_core/README.md#core-file-format-signature-kgo1) and stays supported.
 
@@ -91,9 +92,9 @@ One `core.json` describes the core for every board: the common keys at the top l
 
 ### Numbers for the RTL
 
-- `index` of an item: the switch number of `CMD_SWITCHES`, 0..254. Default: the position of the
-  item in the flat `osd` list, as in kgo1 (so a converted core needs no RTL change). Unique per
-  board.
+- `index` of an item (S, N, T, H): the switch number of `CMD_SWITCHES`, 0..254. Default: the
+  position of the item in the `osd` list of its board (the items of other boards left out), as in
+  kgo1, so a converted core needs no RTL change. Unique per board.
 - `value` of an option: the byte sent to the core for that option, 0..255. Default: the position of
   the option. Unique within the item, gaps allowed.
 - `default` of an item names an option by its key (or its text); a number is taken as a position,
@@ -326,9 +327,10 @@ The FPGA bitstream of the board(s) of its mask (one board each in practice).
 
 ## Steps
 
-1. **make_core**: kgo2 writer next to kgo1 (`make_core.py core.json out.kg`: the format from the
+1. **make_core** (done): kgo2 writer next to kgo1 (`make_core.py core.json out.kg`: the format from the
    extension), the `boards` merge, keys, `index` / `value`, the checks, adding one board's
-   bitstream to an existing `.kg`; README; kgo1 output unchanged (byte compare).
+   bitstream to an existing `.kg`; README; kgo1 output unchanged (byte compare); `kg_dump.py` prints a
+   `.kg`.
 2. **Firmware, reading**: a kgo2 parser in `lib/common` (host tests on files made by make_core),
    the core list with `.kg`, `read_core()` filling the same `core` structure; the state still in
    memory only.

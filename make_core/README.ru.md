@@ -35,6 +35,24 @@ python3 make_core.py core_minig.json tsconf.kg3
 
 Битстрим — это `.bin` из ISE (`bitgen -g Binary:yes`). Готовые файлы кладутся в корень SD-карты, там же должно лежать boot-ядро (`boot.kg1/2/3`).
 
+### kgo2 (`.kg`): один файл для всех плат
+
+Файл с именем `*.kg` пишется в новом формате kgo2 ([docs/kgo2.md](../docs/kgo2.md)): один файл с
+битстримами нескольких плат, настройки пользователя хранятся на SD-карте, а не в файле ядра.
+**Прошивка его пока не читает** (шаги прошивки — в плане docs/kgo2.md); `.kg1` / `.kg2` / `.kg3`
+пишутся как раньше.
+
+```sh
+python3 make_core.py core.json msx.kg                  # все платы из "boards"
+python3 make_core.py core.json msx.kg --boards minig   # только Mini G; остальные платы
+                                                       # существующего msx.kg сохраняют битстримы
+python3 make_core.py core_minig.json msx.kg --boards minig   # json kgo1 (без "boards"): его плата
+python3 kg_dump.py msx.kg                              # что лежит в файле
+```
+
+Ключи `core.json` для kgo2 (`boards`, `key`, `index`, опции-объекты, `loader`, кандидаты `file`,
+`readonly`) описаны в docs/kgo2.md.
+
 ## Справочник по core.json
 
 Файл должен быть строгим JSON: без комментариев и без висячих запятых (`{...},` перед `]`).

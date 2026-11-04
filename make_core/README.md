@@ -35,6 +35,24 @@ python3 make_core.py core_minig.json tsconf.kg3
 
 The bitstream is the `.bin` file from ISE (`bitgen -g Binary:yes`). Copy the resulting files to the root of the SD card. The boot core (`boot.kg1/2/3`) must be there too.
 
+### kgo2 (`.kg`): one file for all boards
+
+An output file named `*.kg` is written in the new format kgo2 ([docs/kgo2.md](../docs/kgo2.md)):
+one file with the bitstreams of several boards, the user's settings kept on the SD card instead of
+in the core file. **No firmware reads it yet** (the firmware steps are in the plan of
+docs/kgo2.md); `.kg1` / `.kg2` / `.kg3` are written as before.
+
+```sh
+python3 make_core.py core.json msx.kg                  # every board of "boards"
+python3 make_core.py core.json msx.kg --boards minig   # Mini G only; the other boards of an
+                                                       # existing msx.kg keep their bitstreams
+python3 make_core.py core_minig.json msx.kg --boards minig   # a kgo1 json (no "boards"): its board
+python3 kg_dump.py msx.kg                              # what the file holds
+```
+
+The `core.json` keys of kgo2 (`boards`, `key`, `index`, option objects, `loader`, `file`
+candidates, `readonly`) are described in docs/kgo2.md.
+
 ## core.json reference
 
 The file must be strict JSON: no comments, no trailing commas (`{...},` before `]`).
