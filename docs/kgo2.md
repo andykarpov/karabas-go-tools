@@ -347,5 +347,6 @@ The FPGA bitstream of the board(s) of its mask (one board each in practice).
    `core.json` per core, `<name>.kg` in every core repo (board builds use `--boards`), the
    release repo karabas-go has `cores/*.kg` for all the boards (karabas-mini is archived). Every
    board was checked against the released `.kgN` with `kg_compare.py` (next186 Mini / Mini G got
-   the newer BIOS of the repo). Left: a core CI that publishes `.kg` to karabas-go; uknc (not
-   released yet).
+   the newer BIOS of the repo). The `.kg` of the
+   core repos reach karabas-go by its Sync cores workflow (`cores.json`, hourly). Left: uknc
+   (not released yet).
