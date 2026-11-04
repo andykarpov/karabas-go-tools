@@ -530,7 +530,21 @@ def kg2_core(cfg, strings):
         return v
     return struct.pack('<HHHHBBBBBBH', 16, strings.ref(cfg["id"]), strings.ref(cfg["name"]), strings.ref(cfg["build"]),
                        types[cfg["type"]], byte("visible", 1), byte("order", 0), byte("rtc_mode", 0),
-                       byte("eeprom_bank", 255), byte("spi_freq", 0), 0)
+                       byte("eeprom_bank", 255), byte("spi_freq", 0), strings.ref(kg2_drives(cfg)))
+
+# "drives": the names of the physical floppy drives in the browser of a physical F item (Karabas Go),
+# e.g. ["A", "B"]; one string "A,B", empty (not given) for the firmware's DF0 / DF1
+def kg2_drives(cfg):
+    drives = cfg.get("drives")
+    if drives is None:
+        return ""
+    if not isinstance(drives, list) or not 1 <= len(drives) <= 2:
+        fail("\"drives\" must be a list of 1..2 names")
+    for d in drives:
+        kg2_ascii("drives", d, 8)
+        if not d or "," in d:
+            fail("\"drives\": '%s' must be 1..8 chars without a comma" % d)
+    return ",".join(drives)
 
 # "loader", or the kgo1 top-level keys dir / extensions / filename / save_dir
 def kg2_loader(cfg, strings):

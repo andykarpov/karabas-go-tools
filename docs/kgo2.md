@@ -124,6 +124,10 @@ mixed. Up to 16 options, names up to 16 chars (the width of the OSD column).
   into `loader` when it is not given.
 - F / FL items: `slot`, `dir`, `exts`, `file`, `autoload` (FL), `physical` (F, Karabas Go: the
   physical floppy drives in the browser), `readonly` (F: the image is mounted without writes).
+- `drives` (top level, or per board): the names of the physical floppy drives 0 and 1 in the
+  browser of a `physical` item and as its value, 1..8 ASCII chars each without a comma, e.g.
+  `["A", "B"]`. Without it the firmware calls them `DF0` / `DF1` (the Amiga names); a missing second
+  name is `DF1`.
 - `exts`: a list (`["dsk", "img"]`) or the kgo1 string (`".dsk,.img"`).
 - `file`: a string or a list of candidates; the first one that exists is used
   (`["kick13.rom", "kick.rom"]`). A path relative to `dir`, or from the root with `/`. The kgo1 key
@@ -242,7 +246,7 @@ distinct string once. One STRINGS section serves every board.
 | 11 | 1 | RTC mode (as kgo1) |
 | 12 | 1 | EEPROM bank (as kgo1: 0..3 the 24C08, 4..254 the `.eep` file, 255 none) |
 | 13 | 1 | SPI frequency in MHz, 0 = default |
-| 14 | 2 | reserved, 0 |
+| 14 | 2 | drives (string): the names of the physical floppy drives, comma separated (`A,B`); empty: `DF0,DF1` |
 
 ### LOADER
 

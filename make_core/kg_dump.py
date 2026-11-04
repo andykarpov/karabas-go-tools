@@ -40,9 +40,9 @@ for t, m, ofs, n in table:
     sec = data[ofs:ofs + n]
     print("\n[%s] boards %s, offset %d, %d bytes" % (NAMES.get(t, "type %d" % t), boards(m), ofs, n))
     if t == 2:
-        size, i, nm, b, typ, vis, order, rtc, eep, spi, _ = struct.unpack_from('<HHHHBBBBBBH', sec, 0)
-        print("  id %r name %r build %r type %d visible %d order %d rtc %d eeprom %d spi %d" %
-              (s(i), s(nm), s(b), typ, vis, order, rtc, eep, spi))
+        size, i, nm, b, typ, vis, order, rtc, eep, spi, drv = struct.unpack_from('<HHHHBBBBBBH', sec, 0)
+        print("  id %r name %r build %r type %d visible %d order %d rtc %d eeprom %d spi %d drives %r" %
+              (s(i), s(nm), s(b), typ, vis, order, rtc, eep, spi, s(drv)))
     elif t == 3:
         size, d, e, sd, flags, nf, fo = struct.unpack_from('<HHHHBBH', sec, 0)
         files = [s(struct.unpack_from('<H', sec, fo + 2 * k)[0]) for k in range(nf)]
