@@ -1,4 +1,4 @@
-# make_core: файлы ядер Karabas (.kg1 / .kg2 / .kg3)
+# make_core: файлы ядер Karabas (.kg и старые .kg1 / .kg2 / .kg3)
 
 [English version](README.md) · Протокол MCU ↔ FPGA: [karabas-go-firmware/docs/protocol.ru.md](https://github.com/andykarpov/karabas-go-firmware/blob/master/docs/protocol.ru.md)
 
@@ -9,51 +9,44 @@
 - меню OSD;
 - настройки ядра: имя, тип, банк EEPROM, режим RTC, частота SPI, параметры file loader.
 
-`make_core.py` собирает такой файл из описания в JSON (`core.json`).
+`make_core.py` собирает такой файл из описания в JSON (`core.json`). Формат определяется именем
+выходного файла:
 
-| Плата | Расширение | Обычное имя JSON |
+| Файл | Формат | Платы |
 |---|---|---|
-| Karabas Go | `.kg1` | `core.json` |
-| Karabas Mini | `.kg2` | `core_mini.json` |
-| Karabas Mini G | `.kg3` | `core_minig.json` |
+| `*.kg` | kgo2 ([docs/kgo2.md](../docs/kgo2.md)): один файл с битстримами всех плат; настройки пользователя хранятся на SD-карте (`/config/<id ядра>.ini`), файл только читается | Go, Mini, Mini G (из `"boards"`) |
+| `*.kg1` / `*.kg2` / `*.kg3` | kgo1 (старый формат, описан ниже): одна плата на файл, настройки пишутся в сам файл | Go / Mini / Mini G |
 
-Формат у всех трёх одинаковый. Расширение лишь говорит прошивке, для какой платы битстрим, поэтому для каждой платы нужен свой битстрим и свой файл.
+Все ядра и релизный репозиторий [karabas-go](https://github.com/andykarpov/karabas-go)
+(`cores/`) используют `.kg` (прошивка 26110415 или новее). kgo1 по-прежнему пишется и читается.
 
 ## Сборка файла ядра
 
 ```
-python3 make_core.py <core.json> <выходной файл>
+python3 make_core.py <core.json> <выходной файл> [--boards go,mini,minig]
 ```
 
-Пути внутри JSON (`bitstream`, `filename` у ROM) считаются от **текущего каталога**, поэтому запускайте скрипт из того каталога, на который ссылается JSON. Типичный скрипт в репозитории ядра (`src/`):
-
-```sh
-python3 make_core.py core.json       tsconf.kg1
-python3 make_core.py core_mini.json  tsconf.kg2
-python3 make_core.py core_minig.json tsconf.kg3
-```
-
-Битстрим — это `.bin` из ISE (`bitgen -g Binary:yes`). Готовые файлы кладутся в корень SD-карты, там же должно лежать boot-ядро (`boot.kg1/2/3`).
-
-### kgo2 (`.kg`): один файл для всех плат
-
-Файл с именем `*.kg` пишется в новом формате kgo2 ([docs/kgo2.md](../docs/kgo2.md)): один файл с
-битстримами нескольких плат, настройки пользователя хранятся на SD-карте, а не в файле ядра.
-**Прошивка его пока не читает** (шаги прошивки — в плане docs/kgo2.md); `.kg1` / `.kg2` / `.kg3`
-пишутся как раньше.
+Пути внутри JSON (`bitstream`, `filename` у ROM) считаются от **текущего каталога**, поэтому запускайте скрипт из того каталога, на который ссылается JSON (`src/` репозитория ядра):
 
 ```sh
 python3 make_core.py core.json msx.kg                  # все платы из "boards"
 python3 make_core.py core.json msx.kg --boards minig   # только Mini G; остальные платы
                                                        # существующего msx.kg сохраняют битстримы
-python3 make_core.py core_minig.json msx.kg --boards minig   # json kgo1 (без "boards"): его плата
-python3 kg_dump.py msx.kg                              # что лежит в файле
+python3 make_core.py core_minig.json msx.kg --boards minig   # json без "boards": его плата
+python3 make_core.py core_minig.json msx.kg3           # kgo1, одна плата
+python3 kg_dump.py msx.kg                              # что лежит в .kg
 ```
 
-Ключи `core.json` для kgo2 (`boards`, `key`, `index`, опции-объекты, `loader`, кандидаты `file`,
-`readonly`) описаны в docs/kgo2.md.
+Сборка платы в ядре (`make <board>` / `build_<board>.sh`) кладёт новый битстрим в `.kg` с
+`--boards <board>`. Битстрим — это `.bin` из ISE (`bitgen -g Binary:yes`). Файлы `.kg` кладутся в
+корень SD-карты, там же должно лежать boot-ядро (`boot.kg`).
 
-Перевод ядра на kgo2:
+`core.json` для `.kg`: ключи ниже на верхнем уровне, а в `"boards"` — то, что отличается по платам
+(как минимум `bitstream` каждой платы); пункт OSD, которого нет на всех платах, получает
+`"boards": [...]`. Остальные его ключи (`key`, `index`, опции-объекты с `key` / `value`, `loader`,
+кандидаты `file`, `readonly`) описаны в [docs/kgo2.md](../docs/kgo2.md).
+
+### Перевод ядра на kgo2
 
 ```sh
 python3 merge_boards.py go=core.json mini=core_mini.json minig=core_minig.json -o core_all.json
@@ -66,6 +59,7 @@ python3 kg1_to_json.py pong.kg1 pong/                 # ядро без исхо
 выравнивает пункты OSD так, что список каждой платы остаётся прежним (те же номера switch).
 `kg_compare.py` сравнивает файл kgo1 с одной платой файла kgo2 (или два файла одного формата):
 битстрим, ROM, поля ядра, загрузчик, кнопки, матрицу и каждый пункт OSD — как их читает прошивка.
+Так были переведены все ядра (2026-11-04).
 
 ## Справочник по core.json
 
