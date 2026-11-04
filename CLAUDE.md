@@ -14,7 +14,7 @@ Development tools for the Karabas Go / Mini / Mini G cores, plain Python 3 scrip
 
 - `karabas-go-firmware`: reads the core files. The header offsets are the `FILE_POS_*` constants of `src/config.h`, parsed by `lib/common/kg_format` (and `kg_matrix`); the OSD items and the protocol are in `docs/protocol.md`. A header change here needs the matching firmware change (and the other way round).
 - `karabas-go-core-*`: the cores. They call `make_core.py` through a symlink `src/make_core.py` -> `../../karabas-go-tools/make_core/make_core.py`, so a change here reaches every core at its next pack: keep old `core.json` files working (a new key is optional, with the old behaviour as its default).
-- `karabas-go` / `karabas-mini`: the release repos (`cores/`).
+- `karabas-go`: the release repo of all the boards (`cores/*.kg`, `firmware/`); `karabas-mini` is archived (2026-11-04).
 
 ## Rules
 
