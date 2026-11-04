@@ -1,4 +1,4 @@
-# make_core: Karabas core files (.kg1 / .kg2 / .kg3)
+# make_core: Karabas core files (.kg, and the older .kg1 / .kg2 / .kg3)
 
 [Русская версия](README.ru.md) · MCU ↔ FPGA protocol: [karabas-go-firmware/docs/protocol.md](https://github.com/andykarpov/karabas-go-firmware/blob/master/docs/protocol.md)
 
@@ -9,51 +9,44 @@ A core file packs everything the RP2040 firmware needs to start a core:
 - the OSD menu;
 - the core settings: name, type, EEPROM bank, RTC mode, SPI clock, file loader settings.
 
-`make_core.py` builds it from a JSON description (`core.json`).
+`make_core.py` builds it from a JSON description (`core.json`). The format follows the name of
+the output file:
 
-| Board | File extension | Usual JSON name |
+| Output | Format | Boards |
 |---|---|---|
-| Karabas Go | `.kg1` | `core.json` |
-| Karabas Mini | `.kg2` | `core_mini.json` |
-| Karabas Mini G | `.kg3` | `core_minig.json` |
+| `*.kg` | kgo2 ([docs/kgo2.md](../docs/kgo2.md)): one file with the bitstreams of all the boards; the user's settings are kept on the SD card (`/config/<core id>.ini`), the file is only read | Go, Mini, Mini G (those of `"boards"`) |
+| `*.kg1` / `*.kg2` / `*.kg3` | kgo1 (the older format, described below): one board per file, the settings written into the file | Go / Mini / Mini G |
 
-The format is the same for all three. The extension only tells the firmware which board the bitstream is for, so each board needs its own bitstream and its own file.
+All the cores and the release repo [karabas-go](https://github.com/andykarpov/karabas-go)
+(`cores/`) use `.kg` (firmware 26110415 or later). kgo1 is still written and read.
 
 ## Building a core file
 
 ```
-python3 make_core.py <core.json> <output file>
+python3 make_core.py <core.json> <output file> [--boards go,mini,minig]
 ```
 
-Paths inside the JSON (`bitstream`, ROM `filename`) are relative to the **current directory**, so run the script from the directory the JSON refers to. A typical script in a core repo (`src/`):
-
-```sh
-python3 make_core.py core.json       tsconf.kg1
-python3 make_core.py core_mini.json  tsconf.kg2
-python3 make_core.py core_minig.json tsconf.kg3
-```
-
-The bitstream is the `.bin` file from ISE (`bitgen -g Binary:yes`). Copy the resulting files to the root of the SD card. The boot core (`boot.kg1/2/3`) must be there too.
-
-### kgo2 (`.kg`): one file for all boards
-
-An output file named `*.kg` is written in the new format kgo2 ([docs/kgo2.md](../docs/kgo2.md)):
-one file with the bitstreams of several boards, the user's settings kept on the SD card instead of
-in the core file. **No firmware reads it yet** (the firmware steps are in the plan of
-docs/kgo2.md); `.kg1` / `.kg2` / `.kg3` are written as before.
+Paths inside the JSON (`bitstream`, ROM `filename`) are relative to the **current directory**, so run the script from the directory the JSON refers to (a core repo's `src/`):
 
 ```sh
 python3 make_core.py core.json msx.kg                  # every board of "boards"
 python3 make_core.py core.json msx.kg --boards minig   # Mini G only; the other boards of an
                                                        # existing msx.kg keep their bitstreams
-python3 make_core.py core_minig.json msx.kg --boards minig   # a kgo1 json (no "boards"): its board
-python3 kg_dump.py msx.kg                              # what the file holds
+python3 make_core.py core_minig.json msx.kg --boards minig   # a json without "boards": its board
+python3 make_core.py core_minig.json msx.kg3           # kgo1, one board
+python3 kg_dump.py msx.kg                              # what a .kg holds
 ```
 
-The `core.json` keys of kgo2 (`boards`, `key`, `index`, option objects, `loader`, `file`
-candidates, `readonly`) are described in docs/kgo2.md.
+A board build of a core (`make <board>` / `build_<board>.sh`) puts its new bitstream into the
+`.kg` with `--boards <board>`. The bitstream is the `.bin` file from ISE (`bitgen -g Binary:yes`).
+Copy the `.kg` files to the root of the SD card; the boot core (`boot.kg`) must be there too.
 
-Converting a core to kgo2:
+The `core.json` of a `.kg`: the keys below at the top level, and in `"boards"` what differs per
+board (at least each board's `bitstream`); an OSD item that is not on every board has
+`"boards": [...]`. Its other keys (`key`, `index`, option objects with `key` / `value`, `loader`,
+`file` candidates, `readonly`) are described in [docs/kgo2.md](../docs/kgo2.md).
+
+### Converting a core to kgo2
 
 ```sh
 python3 merge_boards.py go=core.json mini=core_mini.json minig=core_minig.json -o core_all.json
@@ -66,7 +59,7 @@ python3 kg1_to_json.py pong.kg1 pong/                 # a core without sources: 
 aligns the OSD items so that the list of each board stays its old list (the same switch numbers).
 `kg_compare.py` compares a kgo1 file with one board of a kgo2 file (or two files of a format):
 bitstream, ROMs, the core fields, loader, buttons, matrix and every OSD item, as the firmware
-reads them.
+reads them. All the cores were converted this way (2026-11-04).
 
 ## core.json reference
 

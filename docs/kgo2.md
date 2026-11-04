@@ -1,7 +1,9 @@
 # Core file format kgo2 (`.kg`)
 
-Status: **draft**, agreed in outline (2026-11-04). make_core writes it (step 1); no firmware reads
-it yet. It replaces the older sketch
+Status: **in use** (2026-11-04). make_core writes it, the firmware reads it from 26110414 (the
+user's settings in `/config` from 26110415), every core and the release repo
+[karabas-go](https://github.com/andykarpov/karabas-go) (`cores/*.kg`, all the boards) use it. It
+replaced the older sketch
 `make_core/core_structure_v2.txt`. The current format, kgo1 (`.kg1` / `.kg2` / `.kg3`), is described
 in [make_core/README.md](../make_core/README.md#core-file-format-signature-kgo1) and stays supported.
 
@@ -321,9 +323,12 @@ The FPGA bitstream of the board(s) of its mask (one board each in practice).
   For kgo1 nothing changes: the state stays in the core file, no ini.
 - The state of a kgo2 core is in `/config/<core id>.ini` / `.eep`; the core file is opened for
   reading only.
-- New: "Reset settings" (deletes `/config/<core id>.ini`), the read-only flag of F items (the
-  firmware refuses the write requests of the core, and tells the core through a bit of the
-  `CMD_IMG_*` mount frames, to be defined in `docs/protocol.md`).
+- "Reset settings": About (`A` in the core menu) > `R` deletes `/config/<core id>.ini` / `.eep`
+  and starts the core again.
+- The read-only flag of F items: the image is opened without writes and a write request is
+  dropped; a core with caps bit 5 gets `CMD_IMG_FLAGS` (`4A slot flags`, bit 0) after the size
+  frames and `43 slot 03` for such a write (karabas-go-firmware `docs/protocol.md`; FPGA side:
+  `ENABLE_IMG_WP` / `IMG_WP` of `kg_mcu` in karabas-go-modules).
 
 ## Steps
 
@@ -336,6 +341,11 @@ The FPGA bitstream of the board(s) of its mask (one board each in practice).
    memory only.
 3. **Firmware, state** (done, firmware #114): `/config/<id>.ini` / `.eep` (matching by key, the rules above, debounced
    writes), the loader file, Reset settings; `karabas.ini [fileloader]` is used by kgo1 cores only.
-4. **Read-only images** (firmware #115, modules #23; no core uses it yet): the protocol bit, the firmware, a core that shows it.
-5. **Cores**: one `core.json` per core, `.kg` into the release repos (with the core CI). Tools:
-   `merge_boards.py`, `kg_compare.py`, `kg1_to_json.py`.
+4. **Read-only images** (done: firmware #115, modules #23): the protocol bit, the firmware, the
+   FPGA side. Left: a core that shows it (`ENABLE_IMG_WP`, its floppy's WP).
+5. **Cores** (done 2026-11-04, tools `merge_boards.py`, `kg_compare.py`, `kg1_to_json.py`): one
+   `core.json` per core, `<name>.kg` in every core repo (board builds use `--boards`), the
+   release repo karabas-go has `cores/*.kg` for all the boards (karabas-mini is archived). Every
+   board was checked against the released `.kgN` with `kg_compare.py` (next186 Mini / Mini G got
+   the newer BIOS of the repo). Left: a core CI that publishes `.kg` to karabas-go; uknc (not
+   released yet).
