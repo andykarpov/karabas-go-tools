@@ -331,10 +331,11 @@ The FPGA bitstream of the board(s) of its mask (one board each in practice).
    extension), the `boards` merge, keys, `index` / `value`, the checks, adding one board's
    bitstream to an existing `.kg`; README; kgo1 output unchanged (byte compare); `kg_dump.py` prints a
    `.kg`.
-2. **Firmware, reading**: a kgo2 parser in `lib/common` (host tests on files made by make_core),
+2. **Firmware, reading** (done, firmware #113): a kgo2 parser in `lib/common` (host tests on files made by make_core),
    the core list with `.kg`, `read_core()` filling the same `core` structure; the state still in
    memory only.
-3. **Firmware, state**: `/config/<id>.ini` / `.eep` (matching by key, the rules above, debounced
+3. **Firmware, state** (done, firmware #114): `/config/<id>.ini` / `.eep` (matching by key, the rules above, debounced
    writes), the loader file, Reset settings; `karabas.ini [fileloader]` is used by kgo1 cores only.
-4. **Read-only images**: the protocol bit, the firmware, a core that shows it.
-5. **Cores**: one `core.json` per core, `.kg` into the release repos (with the core CI).
+4. **Read-only images** (firmware #115, modules #23; no core uses it yet): the protocol bit, the firmware, a core that shows it.
+5. **Cores**: one `core.json` per core, `.kg` into the release repos (with the core CI). Tools:
+   `merge_boards.py`, `kg_compare.py`, `kg1_to_json.py`.
