@@ -46,7 +46,7 @@ def read_kgo1(data):
     m["core"] = {
         "id": _str(data[4:36]), "name": _str(data[36:68]), "build": _str(data[68:76]),
         "visible": data[76], "order": data[77], "type": data[78], "eeprom_bank": data[79],
-        "rtc_mode": data[88], "spi_freq": data[185],
+        "rtc_mode": data[88], "spi_freq": data[185], "drives": "",
     }
     m["loader"] = {"dir": _str(data[89:121]), "exts": norm_exts(_str(data[153:185])),
                    "save_dir": _str(data[186:218])}
@@ -125,9 +125,9 @@ def read_kgo2(data, board):
 
     m = {"format": 2}
     c = sec[2]
-    _, i, n, b, typ, vis, order, rtc, eep, spi, _ = struct.unpack_from("<HHHHBBBBBBH", c, 0)
+    _, i, n, b, typ, vis, order, rtc, eep, spi, drv = struct.unpack_from("<HHHHBBBBBBH", c, 0)
     m["core"] = {"id": s(i), "name": s(n), "build": s(b), "visible": vis, "order": order, "type": typ,
-                 "eeprom_bank": eep, "rtc_mode": rtc, "spi_freq": spi}
+                 "eeprom_bank": eep, "rtc_mode": rtc, "spi_freq": spi, "drives": s(drv)}
     m["loader"] = {"dir": "", "exts": [], "save_dir": ""}
     m["loader_files"] = []
     if 3 in sec:

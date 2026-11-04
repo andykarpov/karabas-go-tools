@@ -79,6 +79,7 @@ The file must be strict JSON: no comments, no trailing commas (`{...},` before `
 | `eeprom_bank` | 0–255 | yes | `0`–`3`: a bank of the on-board 24C08 EEPROM; `4`–`254`: 256 bytes stored inside the core file; `255`: no EEPROM. |
 | `rtc_mode` | 0–3 | no (0) | RTC register model: `0` MC146818A, `1` DS1307, `2` ZX Evolution (MC146818A, always BCD), `3` MSM6242B (Amiga, 13 BCD digits; firmware with MSM6242B support). |
 | `spi_freq` | MHz | no (0) | Clock of the MCU ↔ FPGA SPI link for this core. `0` = default 16 MHz. |
+| `drives` | list | no | `.kg` only: the names of the physical floppy drives 0 and 1 (Karabas Go, the browser of a `physical` F item and its value), 1–8 chars each, e.g. `["A", "B"]`. Not set: `DF0` / `DF1`. Needs a firmware that reads it; older ones show `DF0` / `DF1`. |
 | `save_dir` | string | no | Dir of the backup RAM files (`.sav`) of a core with backup RAM (caps bit 3, firmware `docs/protocol.md` "Backup RAM"), up to 32 characters. Not set: `<dir>/saves`. |
 | `buttons` | object | no | Actions of the on-board buttons, see below. Not set: the button goes to the core. |
 | `matrix` | string / object | no | What the LED matrix shows, see below. Not set: the core draws on it. |
