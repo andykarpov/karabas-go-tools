@@ -43,3 +43,6 @@ kg_board.py shot FILE.jpg [--video DEV] one frame of an HDMI capture device (def
   MSC mode and is gone until it is plugged again. The cores of a `.kg` go into the root, the
   default `--to /`.
 - Each step that changes the board checks its result and stops with an error otherwise.
+- With some cores (UKNC on Mini and Mini G, Atari ST) the USB of the board resets every few seconds: commands
+  fail with "no answer", and after a `load` of such a core its port may stay away until the board is replugged.
+  Use a core with a stable USB for checks of the board itself.

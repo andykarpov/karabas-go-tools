@@ -128,6 +128,8 @@ class Port:
         lines = [l for l in lines if not l.startswith("DIAG") and l.strip()]
         if any(l.startswith("ERROR") for l in lines):
             fail("%s: ERROR" % line)
+        if not any(l.startswith("OK") for l in lines):
+            fail("%s: no answer (the port was lost?)" % line)
         return [l for l in lines if l.startswith("+KARABAS")]
 
 
@@ -395,6 +397,8 @@ def main():
         show("AT+KARABAS=load:" + args.core, LOAD_SECONDS)
         if args.core.lower().split(".")[0] == "boot":
             wait_port_back()
+        else:
+            wait_for("the firmware answering", try_version, 30, 1)
         info("core %s" % version()[2])
     elif args.cmd == "osd":
         show("AT+KARABAS=osd" + (":" + args.item if args.item else ""))
