@@ -411,8 +411,8 @@ KG2_SEC_NAMES = { SEC_STRINGS: "STRINGS", SEC_CORE: "CORE", SEC_LOADER: "LOADER"
                   SEC_BUTTONS: "BUTTONS", SEC_MATRIX: "MATRIX", SEC_EEPROM: "EEPROM_INIT",
                   SEC_ROMS: "ROMS", SEC_BITSTREAM: "BITSTREAM" }
 KG2_ITEM_SIZE = 48
-KG2_STATE_TYPES = ('S', 'F', 'FL')       # the items whose value is kept in /config/<id>.ini
-KG2_SWITCH_TYPES = ('S', 'N', 'T', 'H')  # the items sent with CMD_SWITCHES
+KG2_STATE_TYPES = ('S', 'F', 'FL', 'R')       # the items whose value is kept in /config/<id>.ini
+KG2_SWITCH_TYPES = ('S', 'N', 'T', 'H', 'R')  # the items sent with CMD_SWITCHES
 KG2_TEXT_MAX = 16  # an item / option name in the OSD column (P: 32)
 KG2_PATH_MAX = 255
 MAX_FILE_SLOTS = 8
@@ -580,11 +580,19 @@ def kg2_option_list(where, item):
         value = opt.get("value", n)
         if not isinstance(value, int) or not 0 <= value <= 255:
             fail("%s option '%s': value must be 0..255" % (where, opt["name"]))
-        out.append({ "name": opt["name"], "key": key, "value": value })
+        hotkey = opt.get("hotkey", "")
+        if hotkey and item["type"] != 'R':
+            fail("%s option '%s': only the options of R items have hotkeys" % (where, opt["name"]))
+        kg2_ascii("%s option '%s' hotkey" % (where, opt["name"]), hotkey, KG2_TEXT_MAX)
+        out.append({ "name": opt["name"], "key": key, "value": value, "hotkey": hotkey,
+                     "hk": parse_hotkey(hotkey) if hotkey else bytes(2) })
     if len({ o["key"] for o in out }) != len(out):
         fail("%s: option keys are not unique" % where)
     if len({ o["value"] for o in out }) != len(out):
         fail("%s: option values are not unique" % where)
+    hotkeys = [bytes(o["hk"]) for o in out if o["hotkey"]]
+    if len(set(hotkeys)) != len(hotkeys):
+        fail("%s: option hotkeys are not unique" % where)
     return out
 
 # an option of an item: by key, by text, or by position (a number, as kgo1)
@@ -630,7 +638,7 @@ def kg2_osd(cfg, board, strings):
         t = item["type"]
         name = item.get("name", "")
         where = "%s: OSD item %d (%s)" % (board, pos, name or t)
-        if t not in osd_types:
+        if t != 'R' and t not in osd_types:
             fail("%s: unknown type '%s'" % (where, t))
         kg2_ascii(where + " name", name, 32 if t == 'P' else KG2_TEXT_MAX)
         p = { "type": t, "item": item, "where": where, "name": name }
@@ -657,11 +665,16 @@ def kg2_osd(cfg, board, strings):
         elif "index" in item:
             fail("%s: only %s items have an index" % (where, "/".join(KG2_SWITCH_TYPES)))
         p["index"] = index
-        p["opts"] = kg2_option_list(where, item) if t in ('S', 'N') else []
-        if t not in ('S', 'N') and item.get("options"):
-            fail("%s: only S / N items have options" % where)
+        p["opts"] = kg2_option_list(where, item) if t in ('S', 'N', 'R') else []
+        if t not in ('S', 'N', 'R') and item.get("options"):
+            fail("%s: only S / N / R items have options" % where)
+        if t == 'R':
+            if not p["opts"]:
+                fail("%s: an R item needs options" % where)
+            if "hotkey" in item:
+                fail("%s: an R item has hotkeys on its options" % where)
         default = 0
-        if t in ('S', 'N') and p["opts"]:
+        if t in ('S', 'N', 'R') and p["opts"]:
             default = kg2_find_option(where + " default", p["opts"], item.get("default", 0))["value"]
         p["default"] = default
         page = item.get("page", 0)
@@ -677,7 +690,7 @@ def kg2_osd(cfg, board, strings):
                 fail("%s: page %d is opened by OSD item %d too" % (where, o, items[opens[o]][0]))
             opens[o] = n
             p["open"] = o
-        flags = 0
+        flags = 8 if t == 'R' else 0
         p["slot"] = 0
         p["files"] = []
         p["exts"] = ""
@@ -710,6 +723,11 @@ def kg2_osd(cfg, board, strings):
         p["hotkey"] = hotkey
         p["hk"] = parse_hotkey(hotkey) if hotkey else bytes(2)
         parts.append(p)
+
+    # the firmware shows an R item as a hidden switch and one row per option
+    rows = len(parts) + sum(len(p["opts"]) for p in parts if p["type"] == 'R')
+    if rows > MAX_OSD_ITEMS:
+        fail("%s: %d OSD rows with the options of the R items, up to %d" % (board, rows, MAX_OSD_ITEMS))
 
     # the pages: every page is opened by one M item, its parents lead to the main page
     for p in parts:
@@ -755,7 +773,7 @@ def kg2_osd(cfg, board, strings):
         if j == n:
             fail("%s: a condition on the item itself" % p["where"])
         other = parts[j]
-        if other["type"] not in ('S', 'N') or not other["opts"]:
+        if other["type"] not in ('S', 'N', 'R') or not other["opts"]:
             fail("%s: the condition item is not a switch with options" % p["where"])
         value = kg2_find_option(p["where"] + " condition", other["opts"], cond["value"])["value"]
         p["cond"] = (j + 1, (0x80 if disable else 0) | (0x40 if cond.get("not") else 0), value)
@@ -771,11 +789,17 @@ def kg2_osd(cfg, board, strings):
         files_ofs = base + len(tail) if p["files"] else 0
         for f in p["files"]:
             tail += struct.pack('<H', strings.ref(f))
-        rec = struct.pack('<14BH', osd_types[p["type"]], p["flags"], p["index"], p["page"], p["open"],
+        hotkeys_ofs = base + len(tail) if p["type"] == 'R' else 0
+        if p["type"] == 'R':
+            for o in p["opts"]:
+                tail += struct.pack('<BBH', o["hk"][0], o["hk"][1], strings.ref(o["hotkey"]))
+        # an R item is a switch for the firmware that does not know the flag
+        rec = struct.pack('<14BH', osd_types['S' if p["type"] == 'R' else p["type"]], p["flags"], p["index"], p["page"], p["open"],
                           p["cond"][0], p["cond"][1], p["cond"][2], p["default"], p["slot"], p["hk"][0], p["hk"][1],
                           len(p["opts"]), len(p["files"]), 0)
         rec += struct.pack('<7H', strings.ref(p["key"]), strings.ref(p["name"]), strings.ref(p["hotkey"]),
                            strings.ref(p["exts"]), strings.ref(p["dir"]), opts_ofs, files_ofs)
+        rec += struct.pack('<H', hotkeys_ofs)
         rec += bytes(KG2_ITEM_SIZE - len(rec))
         records += rec
     section = struct.pack('<HHI', len(parts), KG2_ITEM_SIZE, 0) + records + tail

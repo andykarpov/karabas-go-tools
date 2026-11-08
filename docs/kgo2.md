@@ -111,6 +111,24 @@ losing the user's settings.
 `options` is a list of strings (as in kgo1) or of objects `{ "name", "key", "value" }`; both may be
 mixed. Up to 16 options, names up to 16 chars (the width of the OSD column).
 
+### Radio items
+
+An item of type `R` is a switch whose options are shown as one row each, with their own hotkeys:
+
+```json
+{ "type": "R", "name": "ROM Bank", "default": 0, "page": 4,
+  "options": [ {"name": "ROMain", "hotkey": "Menu+F1"},
+               {"name": "PQ-DOS", "hotkey": "Menu+F2"} ] }
+```
+
+- For the RTL and the user's settings it is an `S` item: one `index`, the option `value` is sent, the
+  choice is kept under the item `key` as an option key.
+- A hotkey selects its option; the option already selected sends nothing. The item itself has no
+  `hotkey`. A hotkey is optional on each option.
+- In the file it is a type 0 record with the radio flag and the option hotkeys: firmware older than
+  this feature shows an ordinary switch, without the hotkeys.
+- The firmware needs one more row per option: the `osd` list with those rows fits in 64.
+
 ### Files: the loader and F / FL items
 
 ```json
@@ -274,7 +292,7 @@ Item record (48 bytes):
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | type: 0 S, 1 N, 2 T, 3 H, 4 P, 5 F, 6 FL, 7 M, 8 separator (as kgo1) |
-| 1 | 1 | flags: bit 0 physical (F), bit 1 read-only (F), bit 2 autoload (FL), bits 3..7 reserved |
+| 1 | 1 | flags: bit 0 physical (F), bit 1 read-only (F), bit 2 autoload (FL), bit 3 radio (type 0, written for an `R` item), bits 4..7 reserved |
 | 2 | 1 | switch index (`CMD_SWITCHES`), 255 = none |
 | 3 | 1 | page of the item, 0 = the main menu |
 | 4 | 1 | M: the page it opens |
@@ -295,7 +313,8 @@ Item record (48 bytes):
 | 24 | 2 | dir (string, F / FL) |
 | 26 | 2 | offset (in this section) of the option records |
 | 28 | 2 | offset (in this section) of the file candidates: 2 bytes (a string) each |
-| 30 | 18 | reserved, 0 |
+| 30 | 2 | radio: offset (in this section) of the option hotkeys, 4 bytes each: modifiers (1), key code (1), text (string, 2); 0 = none |
+| 32 | 16 | reserved, 0 |
 
 Option record (8 bytes): key (string, 2), name (string, 2), value (1), reserved (3).
 

@@ -52,13 +52,14 @@ for t, m, ofs, n in table:
         for k in range(cnt):
             r = 8 + k * isize
             f = struct.unpack_from('<14BH', sec, r)
-            key, name, hk, exts, d, oo, fo = struct.unpack_from('<7H', sec, r + 16)
+            key, name, hk, exts, d, oo, fo, hko = struct.unpack_from('<8H', sec, r + 16)
             typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, no, nf, _ = f
             line = "  %2d %-2s %-16s key %-16s" % (k, TYPES[typ] if typ < len(TYPES) else typ, s(name), s(key))
             if index != 255: line += " index %d" % index
             if page: line += " page %d" % page
             if opn: line += " opens %d" % opn
             if ci: line += " %s item %d %s%d" % ("enable_if" if cf & 0x80 else "show_if", ci - 1, "not " if cf & 0x40 else "", cv)
+            if flags & 8: line += " radio"
             if s(hk): line += " hotkey %s (%02x %02x)" % (s(hk), hm, hkk)
             if typ in (5, 6):
                 files = [s(struct.unpack_from('<H', sec, fo + 2 * j)[0]) for j in range(nf)]
@@ -69,6 +70,9 @@ for t, m, ofs, n in table:
                 for j in range(no):
                     ok, on, ov = struct.unpack_from('<HHB', sec, oo + 8 * j)
                     opts.append("%s%s=%d" % ("*" if ov == dflt else "", s(ok), ov))
+                if hko:
+                    hks = [struct.unpack_from('<BBH', sec, hko + 4 * j) for j in range(no)]
+                    print("       hotkeys: " + " ".join("%s(%02x %02x)" % (s(h[2]) or "-", h[0], h[1]) for h in hks))
                 print("       options: " + " ".join(opts) + "   (%r)" % [s(struct.unpack_from('<HHB', sec, oo + 8 * j)[1]) for j in range(no)])
     elif t == 5:
         print("  " + sec.hex(" "))

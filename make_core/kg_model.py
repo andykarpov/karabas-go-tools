@@ -155,17 +155,19 @@ def read_kgo2(data, board):
         for k in range(cnt):
             r0 = 8 + k * isize
             f = struct.unpack_from("<14BH", o, r0)
-            key, name, hk, exts, d, oo, fo = struct.unpack_from("<7H", o, r0 + 16)
+            key, name, hk, exts, d, oo, fo, hko = struct.unpack_from("<8H", o, r0 + 16)
             typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, no, nf, _ = f
             opts = [struct.unpack_from("<HHB", o, oo + 8 * j) for j in range(no)]
-            raw.append((typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, opts, nf, fo, key, name, hk, exts, d))
+            hks = [struct.unpack_from("<BBH", o, hko + 4 * j) for j in range(no)] if hko else []
+            raw.append((typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, opts, nf, fo, key, name, hk, exts, d, hks))
         values = [[ov for _, _, ov in r[12]] for r in raw]
-        for k, (typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, opts, nf, fo, key, name, hk, exts, d) in enumerate(raw):
+        for k, (typ, flags, index, page, opn, ci, cf, cv, dflt, slot, hm, hkk, opts, nf, fo, key, name, hk, exts, d, hks) in enumerate(raw):
             t = OSD_TYPES[typ]
             it = {"type": t, "name": s(name), "key": s(key), "index": index if index != 255 else None,
                   "options": [s(on) for _, on, _ in opts], "option_keys": [s(ok) for ok, _, _ in opts],
                   "option_values": values[k], "keys": bytes([hm, hkk]), "page": page,
-                  "open": opn if t == "M" else 0, "hotkey": s(hk), "flags": 0}
+                  "open": opn if t == "M" else 0, "hotkey": s(hk), "flags": 0,
+                  "radio": bool(flags & 8), "option_hotkeys": [(bytes([h[0], h[1]]), s(h[2])) for h in hks]}
             it["default"] = values[k].index(dflt) if dflt in values[k] else (dflt if not opts else 0)
             if ci:
                 cvals = values[ci - 1]
