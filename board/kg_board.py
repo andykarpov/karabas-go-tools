@@ -39,6 +39,10 @@ TIOCMBIS = getattr(termios, "TIOCMBIS", 0x5416)
 TIOCM_DTR = getattr(termios, "TIOCM_DTR", 0x002)
 
 
+LOAD_SECONDS = 90   # a core with its ROMs; a mounted file loader file
+SYNC_SECONDS = 35   # the firmware gives up after 30 s
+
+
 def fail(msg):
     print("error: " + msg, file=sys.stderr)
     sys.exit(1)
@@ -131,6 +135,22 @@ def at_once(line, seconds=3):
     p = Port()
     try:
         return p.at(line, seconds)
+    finally:
+        p.close()
+
+
+def show(line, seconds=3):
+    for r in at_once(line, seconds):
+        info(r)
+
+
+def send_delivered(line, sync):
+    """A line of input for the board; sync: returns only when it has been delivered."""
+    p = Port()
+    try:
+        p.at(line)
+        if sync:
+            p.at("AT+KARABAS=sync", SYNC_SECONDS)
     finally:
         p.close()
 
@@ -324,8 +344,22 @@ def main():
     sub.add_parser("version")
     p = sub.add_parser("at"); p.add_argument("lines", nargs="+")
     p = sub.add_parser("log"); p.add_argument("seconds", nargs="?", type=float, default=5)
-    p = sub.add_parser("key"); p.add_argument("keys", nargs="+")
-    p = sub.add_parser("type"); p.add_argument("text")
+    p = sub.add_parser("key"); p.add_argument("keys", nargs="+"); p.add_argument("--sync", action="store_true")
+    p = sub.add_parser("type"); p.add_argument("text"); p.add_argument("--sync", action="store_true")
+    sub.add_parser("state")
+    sub.add_parser("sync")
+    sub.add_parser("reset")
+    p = sub.add_parser("load"); p.add_argument("core")
+    p = sub.add_parser("osd"); p.add_argument("item", nargs="?")
+    p = sub.add_parser("mount"); p.add_argument("item"); p.add_argument("path")
+    p = sub.add_parser("eject"); p.add_argument("item")
+    p = sub.add_parser("mouse"); p.add_argument("dx", type=int); p.add_argument("dy", type=int)
+    p.add_argument("buttons", nargs="?", default=""); p.add_argument("wheel", nargs="?", default="")
+    p = sub.add_parser("click"); p.add_argument("button", nargs="?", default="left")
+    p = sub.add_parser("pad"); p.add_argument("port", choices=["0", "1"]); p.add_argument("buttons", nargs="+")
+    p.add_argument("--hold", action="store_true")
+    p = sub.add_parser("release")
+    p = sub.add_parser("debug"); p.add_argument("value", choices=["0", "1"])
     sub.add_parser("menu")
     p = sub.add_parser("fw"); p.add_argument("file")
     p = sub.add_parser("sd"); p.add_argument("files", nargs="+"); p.add_argument("--to", default="/")
@@ -352,9 +386,35 @@ def main():
         finally:
             p.close()
     elif args.cmd == "key":
-        at_once("AT+KARABAS=key:" + " ".join(args.keys))
+        send_delivered("AT+KARABAS=key:" + " ".join(args.keys), args.sync)
     elif args.cmd == "type":
-        at_once("AT+KARABAS=type:" + args.text)
+        send_delivered("AT+KARABAS=type:" + args.text, args.sync)
+    elif args.cmd in ("state", "reset", "release", "sync"):
+        show("AT+KARABAS=" + args.cmd, SYNC_SECONDS if args.cmd == "sync" else LOAD_SECONDS)
+    elif args.cmd == "load":
+        show("AT+KARABAS=load:" + args.core, LOAD_SECONDS)
+        if args.core.lower().split(".")[0] == "boot":
+            wait_port_back()
+        info("core %s" % version()[2])
+    elif args.cmd == "osd":
+        show("AT+KARABAS=osd" + (":" + args.item if args.item else ""))
+    elif args.cmd == "mount":
+        show("AT+KARABAS=mount:%s:%s" % (args.item, args.path), LOAD_SECONDS)
+    elif args.cmd == "eject":
+        show("AT+KARABAS=eject:" + args.item)
+    elif args.cmd == "mouse":
+        line = "AT+KARABAS=mouse:%d,%d" % (args.dx, args.dy)
+        if args.buttons != "" or args.wheel != "":
+            line += "," + args.buttons
+        if args.wheel != "":
+            line += "," + args.wheel
+        send_delivered(line, True)
+    elif args.cmd == "click":
+        send_delivered("AT+KARABAS=click:" + args.button, True)
+    elif args.cmd == "pad":
+        send_delivered("AT+KARABAS=%s:%s:%s" % ("padhold" if args.hold else "pad", args.port, " ".join(args.buttons)), True)
+    elif args.cmd == "debug":
+        show("AT+KARABAS=debug:" + args.value)
     elif args.cmd == "menu":
         to_boot_core()
         info("core boot")
