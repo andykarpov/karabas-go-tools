@@ -11,6 +11,19 @@ kg_board.py at LINE...                 send AT lines, print the replies
 kg_board.py log [SECONDS]              print the debug log (debug=1), DIAG lines left out
 kg_board.py key KEYS...                press keys, e.g. menu+esc down enter (names: firmware kg_keys)
 kg_board.py type TEXT                  type a text
+                                       (key, type: --sync returns when it has been delivered)
+kg_board.py state                      the running core, the OSD screen, the file items
+kg_board.py load CORE                  start a core (file name or id) from any core; boot: reboot
+kg_board.py reset                      start the running core again, with clean memory
+kg_board.py osd [ITEM[=VALUE]]         the menu items of the core: all, one, set (name or number)
+kg_board.py mount ITEM PATH            an image for a file item
+kg_board.py eject ITEM                 no image
+kg_board.py mouse DX DY [BTNS [WHEEL]] move, BTNS = "" keeps the buttons held (bit 0 left, 1 right, 2 middle)
+kg_board.py click [left|right|middle]  a mouse click
+kg_board.py pad 0|1 BUTTONS... [--hold] pad buttons (up+a), port 0 or 1, released after each
+kg_board.py release                    all keys, mouse buttons and pad buttons up
+kg_board.py sync                       waits until the queued input has been delivered
+kg_board.py debug 0|1                  the debug log until the next reboot
 kg_board.py menu                       back to the boot core (Ctrl+Alt+Backspace)
 kg_board.py fw FILE.uf2                flash the MCU firmware
 kg_board.py sd FILE... [--to DIR]      copy files to the SD card (--sd2: the second card)
@@ -30,3 +43,6 @@ kg_board.py shot FILE.jpg [--video DEV] one frame of an HDMI capture device (def
   MSC mode and is gone until it is plugged again. The cores of a `.kg` go into the root, the
   default `--to /`.
 - Each step that changes the board checks its result and stops with an error otherwise.
+- With some cores (UKNC on Mini and Mini G, Atari ST) the USB of the board resets every few seconds: commands
+  fail with "no answer", and after a `load` of such a core its port may stay away until the board is replugged.
+  Use a core with a stable USB for checks of the board itself.
