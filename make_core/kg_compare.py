@@ -59,6 +59,8 @@ for i, (x, y) in enumerate(zip(a["osd"], b["osd"])):
         diff("%s %s" % (w, k), x[k], y[k])
     if x["type"] not in ("M", "-"):
         diff(w + " hotkey", x["hotkey"], y["hotkey"])
+        for k in ("radio", "option_hotkeys"):
+            diff(w + " " + k, x.get(k) or None, y.get(k) or None)
     if x["type"] in ("S", "N", "T", "H") and y["type"] in ("S", "N", "T", "H"):
         diff(w + " switch", x["index"], y["index"])
     if x["type"] in ("F", "FL") and y["type"] == x["type"]:
