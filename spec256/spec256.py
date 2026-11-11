@@ -1,7 +1,7 @@
 #!/bin/env python3
 
 #########################################################
-# Karabas Go Spec256 snapshot convertor v1.4            #
+# Karabas Go Spec256 snapshot convertor v1.5            #
 #                                                       #
 # (c) 2026 Andy Karpov <andy.karpov@gmail.com>          #
 #########################################################
@@ -18,7 +18,8 @@
 #   4  1     version: 1, 2 with flag 4 or 5 (a core of version 1 leaves the extension out)
 #   5  1     flags: 0 the ROM planes follow, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF,
 #            4 the planes of the ROM 0 follow those of the ROM 1 (NAME.GFA, the 128 menu ROM),
-#            5 the 128K block follows the backgrounds
+#            5 the 128K block follows the backgrounds, 6 the block of the rules follows everything (a core
+#            before v1.5 does not read it and plays the game as before)
 #   6  1     UpColorsMixed
 #   7  1     DownColorsMixed
 #   8  1     number of backgrounds (the highest Bnn + 1; a missing one is colour 0)
@@ -40,6 +41,20 @@
 #   then     49152 per background: the 256x192 paper of the 320x200 picture (x 32..287, y 4..195)
 #   then     the 128K block, if flag 5: 8 bytes (#7FFD of the snapshot, 7 reserved), then the banks
 #            1, 3, 4, 6, 7, each 16384 bytes of RAM and 131072 of planes
+#   then     the block of the rules, if flag 6, 160 bytes; it replaces the rules of the header:
+#            0    flags: 0 the rendering of Spec256 DOS (indices C0-FF take the ink of the attribute, 0xFF is
+#                 a colour, the background only at index 0, no mixing), 1 the AY state at 136 is valid
+#            1    the background when no rule matches: n, 0xFE none, 0xFF the one before
+#            2 2  the conditions that hold in the snapshot (bit n: condition n)
+#            4    16 conditions of a byte: address (2), mask, value; it holds while the byte at the address,
+#                 masked, is = the value (or < with its bit at 68)
+#            68 2 the conditions that compare with <
+#            72   16 rules: background (n, 0xFE none, 0xFD keep the one there is, 0xFF no rule), conditions
+#                 (2, bit n: condition n), reserved; the first rule whose conditions all hold
+#            136  the AY: the register selected, R0..R15
+#            153  the background at the start (as byte 1), 154 6 reserved
+#            Spec256 DOS v1.2 chose its backgrounds with routines of its own (DOS_BACKGROUNDS below, read
+#            from SPEC256.EXE by the Spec256 core for MiSTer, albconde/SPEC256_MISTER).
 # The planes of a 128K bank (as ZX-Poly): NAME.GFn, else its part of NAME.GFX (the banks 5, 2 and the
 # one at C000 in the snapshot), else the bank itself in every plane (not coloured). The registers of a
 # 128K snapshot: its PC, IFF1 = IFF2; of a 48K one: PC 0072 (a RETN in the ROM) pops the PC.
@@ -230,7 +245,7 @@ def ezx_extract(path, outdir, overwrite=True):
     return out / (stem + ".SNA")
 
 
-msg = "Karabas Go Spec256 snapshot convertor v1.4"
+msg = "Karabas Go Spec256 snapshot convertor v1.5"
 parser = argparse.ArgumentParser(description = msg)
 parser.add_argument('sna_file', help='NAME.SNA, or NAME.EZX of EmuZWin')
 parser.add_argument('--plain', action='store_true', help='no extension (the format of v1.2)')
@@ -442,6 +457,65 @@ DEFAULT_PALETTE = bytes.fromhex(
 # games that want colour 0 and 0xFF drawn from the palette (ZX-Poly's spec256appbase.txt)
 PLAIN_00_FF = ("booty", "cybernoid_ii256", "eaglesns", "rene256")
 
+# Spec256 DOS v1.2 (SPEC256.EXE, as the Spec256 core for MiSTer reads it): the routines that choose the
+# background, by their address in the program, and the routine of each of its 12 games (its table of
+# games at 0x1B3D72). A routine: (default, [(background, condition, ...)]), the first rule whose
+# conditions all hold, else the default; a background is n, NONE (no background) or KEEP (the one there
+# is); a condition is (address, bytes, op, value, mask), the bytes little endian, op "=" or "<".
+NONE, KEEP, NO_RULE = 0xFE, 0xFD, 0xFF
+DOS_ROUTINES = {
+    0x3FCA: (0, []),
+    0x3FDA: (0, [(1, (0xCC02, 1, "=", 3, None))]),
+    0x3FF8: (0, [(1, (0xCC1C, 2, "=", 0, None))]),
+    0x4019: (1, [(2, (0xCBF4, 1, "<", 8, None)),
+                 (0, (0xCBF4, 1, "<", 20, None))]),
+    0x4041: (0, [(1, (0x5800, 1, "=", 7, None))]),
+    0x4060: (1, [(1, (0x5800, 1, "=", 7, None)),
+                 (0, (0xBEB2, 1, "<", 5, None))]),
+    0x408D: (0, [(2, (0x5802, 1, "=", 0x47, None)),
+                 (KEEP, (0x5AE0, 1, "=", 7, 7)),
+                 (1, (0x5AE0, 1, "=", 0x46, None))]),
+    0x40C4: (1, [(NONE, (0x4000, 4, "=", 0, None), (0x4020, 4, "=", 0xF87CC007, None)),
+                 (3, (0x4000, 4, "=", 0, None), (0x4010, 2, "=", 0x4040, None)),
+                 (0, (0x4000, 4, "=", 0, None), (0x4040, 2, "=", 0x02FF, None)),
+                 (NONE, (0x4000, 4, "=", 0, None)),
+                 (2, (0x4000, 4, "=", 0xFC000000, None))]),
+}
+DOS_GAMES = {"SABREW": 0x3FCA, "UNDERW": 0x408D, "KNLORE": 0x40C4, "JETPAC": 0x3FCA, "PHANTIS1": 0x3FDA,
+             "PROFANAT": 0x3FCA, "ARMYMOV1": 0x3FF8, "ARMYMOV2": 0x4019, "GAMEOV1": 0x4041,
+             "GAMEOV2": 0x4060, "SOLOMONS": 0x3FCA, "CYBERNOI": 0x3FCA}
+
+# a routine as the core takes it: the conditions of a byte (address, mask, value, op) and the rules
+# (background, bit n: condition n), a background without its file shown as none
+def byte_rules(routine, have):
+    default, rules = routine
+    conds, out = [], []
+    def bg(n):
+        return n if n in (NONE, KEEP) or n in have else NONE
+    for n, *tests in rules:
+        need = 0
+        for addr, width, op, value, mask in tests:
+            mask = (1 << 8 * width) - 1 if mask is None else mask
+            if op == "<" and (width != 1 or mask != 0xFF):
+                raise ValueError("< compares a whole byte")
+            for j in range(width):
+                m = mask >> 8 * j & 0xFF
+                if not m:
+                    continue
+                v = value >> 8 * j & 0xFF
+                c = (addr + j, m, v & m if op == "=" else v, op)
+                if c not in conds:
+                    conds.append(c)
+                need |= 1 << conds.index(c)
+        out.append((bg(n), need))
+    if len(conds) > 16 or len(out) > 16:
+        raise ValueError("the core takes 16 conditions and 16 rules")
+    return (NO_RULE if default == KEEP else bg(default)), conds, out
+
+def cond_holds(c, byte):
+    addr, m, v, op = c
+    return (byte & m) == v if op == "=" else (byte & m) < v
+
 def read_palette(name):
     data = file_read(name, "rb")
     if len(data) == 768:
@@ -534,8 +608,47 @@ bk_over_ff = cfg.get("BkOverFF", 0) != 0
 up_mixed = cfg.get("UpColorsMixed", 64)
 down_mixed = cfg.get("DownColorsMixed", 0)
 
+# the block of the rules (flag 6): the 12 games of Spec256 DOS
+game = sna_filename.stem.upper()
+dos = game in DOS_GAMES and not is128
+tail = None
+if dos:
+    if rules:
+        print(f"{cfg_filename}: a game of Spec256 DOS, its rules are left out")
+        rules = []
+    default, conds, brules = byte_rules(DOS_ROUTINES[DOS_GAMES[game]], backgrounds)
+    holds = 0
+    for i, cd in enumerate(conds):
+        if not 0x4000 <= cd[0] <= 0xFFFF:
+            raise ValueError("a condition outside the RAM")
+        if cond_holds(cd, sna[cd[0] - 0x4000]):
+            holds |= 1 << i
+    start = default
+    for n, need in brules:
+        if holds & need == need:
+            start = n
+            break
+    if start in (NO_RULE, KEEP):        # the program starts with the background 0
+        start = 0 if 0 in backgrounds else NONE
+    tail = bytearray(160)
+    tail[0] = 1                         # the rendering of Spec256 DOS
+    tail[1] = default
+    tail[2:4] = holds.to_bytes(2, "little")
+    lt = 0
+    for i, (addr, m, v, op) in enumerate(conds):
+        tail[4 + 4 * i:8 + 4 * i] = bytes([addr & 0xFF, addr >> 8, m, v])
+        if op == "<":
+            lt |= 1 << i
+    tail[68:70] = lt.to_bytes(2, "little")
+    for i in range(16):
+        n, need = brules[i] if i < len(brules) else (NO_RULE, 0)
+        tail[72 + 4 * i:76 + 4 * i] = bytes([n, need & 0xFF, need >> 8, 0])
+    tail[153] = start
+    print(f"Spec256 DOS: background routine {DOS_GAMES[game]:04X}, {len(conds)} conditions, "
+          f"{len(brules)} rules, default {default:02X}, at the start {start:02X}")
+
 flags = (1 if rom_planes else 0) | (2 if paper00inkff else 0) | (4 if hide_same else 0) | (8 if bk_over_ff else 0) | \
-        (16 if rom0_planes else 0) | (32 if is128 else 0)
+        (16 if rom0_planes else 0) | (32 if is128 else 0) | (64 if tail else 0)
 o.write(b"K256")
 # the rules against the RAM of the snapshot (4000-FFFF)
 match = 0
@@ -575,6 +688,8 @@ if is128:
     for n in (1, 3, 4, 6, 7):
         o.write(bank_ram[n])
         o.write(bank_planes[n])
+if tail:
+    o.write(tail)
 o.close()
 
 print(f"palette: {pal_filename or 'standard'}, cfg: {cfg_filename or 'none'}, ROM graphics: {gfb_filename or 'none'}, "
