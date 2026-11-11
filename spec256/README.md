@@ -71,8 +71,11 @@ snapshot) have no `.CFG`: the program chose their backgrounds with routines of i
 its own way. As the Spec256 core for MiSTer (albconde/SPEC256_MISTER) read them from `SPEC256.EXE`, the
 converter writes for them the block of the rules (below): the background routine of the game from the table
 of games of the program, as conditions on bytes of the RAM, and the flag of the rendering of Spec256 DOS
-(colours C0–FF take the INK of the attribute, 0xFF is a colour, the background only at colour 0, no mixing).
-A rule that shows a background without its file shows none.
+(colours C0–FF take the INK of the attribute, 0xFF is a colour, the background only at colour 0, no mixing)
+and of the arithmetic of Spec256 DOS: after an instruction that puts arithmetic into A (ADD, ADC, SUB, SBC
+of a register or a number, AND, XOR, OR of a number, INC A, DEC A, DAA, LD A,n, IN A,(n), NEG, LD A,I / R,
+IN A,(C)) every lane takes the A of the main CPU; AND, XOR, OR of a register keep the colour (the
+"arithmetic mono" of the MiSTer core). A rule that shows a background without its file shows none.
 
 ### Fixes of games
 
@@ -84,6 +87,21 @@ By the name of the snapshot (`GAME_FIXES`, found by the Spec256 core for MiSTer)
 | Mad Mix 2 | the painted entries of its table of reversed bytes at `5B00` lose their colour |
 | Jetpac | the coloured pixels of `7C65`–`7E08` become C0 + their brightness: with the DOS rendering they take the INK (the rocket changes colour as in the original) |
 | Bruce Lee | colour 07 on paper pixels (bit 0 of the main byte), in the RAM and the ROM planes, becomes 0: the background shows there |
+
+Read windows (the block of the windows, the `rules` of the MiSTer core's `spec256_games.ini`): where a game
+looks up a table that only moves bits (a mirror, a shift, a mask) with a coloured index, each lane reads at
+its own address (its HL, DE or BC) in the pages of the window, and every plane byte is XORed; Spec256 DOS
+v1.2 does the same with readers of its own in Knight Lore, Sabre Wulf and Underwurlde. `LO[-HI]` are the
+pages (A15..A8 of the address of the main CPU), `op=XX/MM` (`op!=`) a filter on the opcode:
+
+| Game | Windows |
+|---|---|
+| Knight Lore | `F1; F2-FF op!=A6` (the MiSTer core has `xor=FF` on the second: on our core that fills the cells around the sprites with the INK, checked on a Mini G) |
+| Sabre Wulf, Underwurlde | `F0-FF` |
+| Head over Heels | `B9; 40-FF op=0A/EF` (`LD A,(BC)`, `LD A,(DE)`) |
+| Scooby-Doo | `FC; 40-FF op=0A/EF` |
+| Bubbler | `F9-FF` |
+| Mad Mix 2 | `5B` |
 
 The other keys of EmuZWin (`GFXLeveled*`, `UpMixChgBright`, `DownMixPaper`, …) are not used; what they mean
 and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys).
@@ -98,7 +116,7 @@ and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys
 | 442396 | | the extension (not with `--plain`), little endian: |
 | +0 | 4 | `K256` |
 | +4 | 1 | version: 1; 2 with flag 4 or 5 (a core that knows version 1 leaves such an extension out) |
-| +5 | 1 | flags: 0 ROM 1 planes, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF, 4 ROM 0 planes, 5 the 128K block, 6 the block of the rules (a core before converter v1.5 does not read it and plays as before) |
+| +5 | 1 | flags: 0 ROM 1 planes, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF, 4 ROM 0 planes, 5 the 128K block, 6 the block of the rules (a core before converter v1.5 does not read it and plays as before), 7 the block of the windows (a core before v1.6 does not read it) |
 | +6 | 1 | UpColorsMixed |
 | +7 | 1 | DownColorsMixed |
 | +8 | 1 | number of backgrounds (the highest Bnn + 1) |
@@ -113,7 +131,7 @@ and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys
 | | 49152 × n | the backgrounds, 256×192 each |
 | | 8 + 5 × 147456 | the 128K block, if flag 5: `#7FFD` and 7 reserved bytes, then the banks 1, 3, 4, 6, 7: 16384 bytes of RAM and 131072 of planes each |
 | | 160 | the block of the rules, if flag 6; it replaces the rules at +784 (and +10, +11): |
-| ++0 | 1 | flags: 0 the rendering of Spec256 DOS |
+| ++0 | 1 | flags: 0 the rendering of Spec256 DOS, 1 the arithmetic of Spec256 DOS (the lanes take A after arithmetic) |
 | ++1 | 1 | the background when no rule matches: n, `FE` none, `FF` the one there is |
 | ++2 | 2 | the conditions that hold in the snapshot (bit n: condition n) |
 | ++4 | 64 | 16 conditions: address (2), mask, value; it holds while the byte at the address, masked, = the value (< with its bit at ++68); the core follows the writes of the CPU |
@@ -122,5 +140,9 @@ and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys
 | ++136 | 17 | reserved (zeros) |
 | ++153 | 1 | the background at the start (n, `FE` none) |
 | ++154 | 6 | reserved |
+| | 64 | the block of the windows, if flag 7 (after the block of the rules, or in its place without flag 6): |
+| ++0 | 1 | the number of windows (up to 8), then 7 reserved |
+| ++8 | 48 | 8 windows: first page, last page, opcode value, opcode mask, flags (bit 0: negate the opcode test), xor. A read of data (not an M1 cycle) hits when the page of the address of the main CPU is in [first, last] and `((opcode ^ value) & mask) == 0` (or not, with bit 0); the opcode is the last byte read in an M1 cycle (`xx` of `CB xx` / `ED xx`, `CB` of `DD CB d xx`); the first window that hits wins. On a hit each lane reads at its own address (through HL, DE, BC) when the 8 differ, and each plane byte is XORed |
+| ++56 | 8 | reserved |
 
 A 48K game is version 1, byte for byte as the converter v1.3 wrote it.

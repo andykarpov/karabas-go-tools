@@ -1,7 +1,7 @@
 #!/bin/env python3
 
 #########################################################
-# Karabas Go Spec256 snapshot convertor v1.5            #
+# Karabas Go Spec256 snapshot convertor v1.6            #
 #                                                       #
 # (c) 2026 Andy Karpov <andy.karpov@gmail.com>          #
 #########################################################
@@ -19,7 +19,9 @@
 #   5  1     flags: 0 the ROM planes follow, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF,
 #            4 the planes of the ROM 0 follow those of the ROM 1 (NAME.GFA, the 128 menu ROM),
 #            5 the 128K block follows the backgrounds, 6 the block of the rules follows everything (a core
-#            before v1.5 does not read it and plays the game as before)
+#            before v1.5 does not read it and plays the game as before), 7 the block of the windows
+#            follows the block of the rules (or everything, without flag 6; a core before v1.6 does not
+#            read it)
 #   6  1     UpColorsMixed
 #   7  1     DownColorsMixed
 #   8  1     number of backgrounds (the highest Bnn + 1; a missing one is colour 0)
@@ -43,7 +45,10 @@
 #            1, 3, 4, 6, 7, each 16384 bytes of RAM and 131072 of planes
 #   then     the block of the rules, if flag 6, 160 bytes; it replaces the rules of the header:
 #            0    flags: 0 the rendering of Spec256 DOS (indices C0-FF take the ink of the attribute, 0xFF is
-#                 a colour, the background only at index 0, no mixing)
+#                 a colour, the background only at index 0, no mixing), 1 the arithmetic of Spec256 DOS
+#                 (after ADD, ADC, SUB, SBC r / n, AND, XOR, OR n, INC A, DEC A, DAA, LD A,n, IN A,(n),
+#                 NEG, LD A,I / R, IN A,(C) every lane takes the A of the main CPU; a core before v1.6
+#                 leaves the colour)
 #            1    the background when no rule matches: n, 0xFE none, 0xFF the one before
 #            2 2  the conditions that hold in the snapshot (bit n: condition n)
 #            4    16 conditions of a byte: address (2), mask, value; it holds while the byte at the address,
@@ -55,6 +60,16 @@
 #            153  the background at the start (as byte 1), 154 6 reserved
 #            Spec256 DOS v1.2 chose its backgrounds with routines of its own (DOS_ROUTINES below, read
 #            from SPEC256.EXE by the Spec256 core for MiSTer, albconde/SPEC256_MISTER).
+#   then     the block of the windows, if flag 7, 64 bytes: the reads of data (not an opcode) where the
+#            lanes read at their own address (HL, DE, BC of each lane, any page of the RAM) when the 8
+#            differ, and every plane byte is XORed (the "windows" of GAME_FIXES):
+#            0    the number of windows (up to 8), 7 reserved
+#            8    8 windows of 6 bytes: first page, last page (A15..A8 of the address of the main CPU),
+#                 opcode value, opcode mask, flags (bit 0: negate the opcode test), xor; a window hits
+#                 when the page is in [first, last] and ((opcode ^ value) & mask) == 0 (or not, with
+#                 bit 0); the opcode is the last byte read in an M1 cycle (xx of CB xx and ED xx, CB
+#                 of DD CB d xx); the first window that hits wins
+#            56   8 reserved
 # The planes of a 128K bank (as ZX-Poly): NAME.GFn, else its part of NAME.GFX (the banks 5, 2 and the
 # one at C000 in the snapshot), else the bank itself in every plane (not coloured). The registers of a
 # 128K snapshot: its PC, IFF1 = IFF2; of a 48K one: PC 0072 (a RETN in the ROM) pops the PC.
@@ -245,7 +260,7 @@ def ezx_extract(path, outdir, overwrite=True):
     return out / (stem + ".SNA")
 
 
-msg = "Karabas Go Spec256 snapshot convertor v1.5"
+msg = "Karabas Go Spec256 snapshot convertor v1.6"
 parser = argparse.ArgumentParser(description = msg)
 parser.add_argument('sna_file', help='NAME.SNA, or NAME.EZX of EmuZWin')
 parser.add_argument('--plain', action='store_true', help='no extension (the format of v1.2)')
@@ -410,14 +425,48 @@ def read_palette(name):
 #             gives it the ink of the attribute: the rocket of Jetpac changes colour as in the original
 #   paper0    colours that become 0 on the paper pixels (bit 0 in the main byte) of the RAM and the ROM
 #             planes: Bruce Lee (its background shows there)
+#   windows   the read windows (the block of the windows), "LO[-HI] [op=XX[/MM] | op!=XX[/MM]] [xor=XX]; ...":
+#             the tables that only move bits (mirror, shift, mask) read with a coloured index; Spec256 DOS
+#             v1.2 reads Knight Lore, Sabre Wulf and Underwurlde so (its synthetic readers 0x4959 and
+#             0x49D7: the register of the lane, shifted or inverted)
 GAME_FIXES = {
     "cybernoid_ii256": {"patch": {0x80C8: 0xCB, 0x80C9: 0x16, 0x80CA: 0xCB, 0x80CB: 0x0E,
                                   0x8136: 0xCB, 0x8137: 0x1E, 0x8138: 0xCB, 0x8139: 0x06},
                         "decolour": [(0x80C8, 0x80CB), (0x8136, 0x8139)]},
-    "madmix2fim": {"decolour": [(0x5B1C, 0x5B1F), (0x5B3C, 0x5B3D)]},
+    "madmix2fim": {"decolour": [(0x5B1C, 0x5B1F), (0x5B3C, 0x5B3D)], "windows": "5B"},
     "jetpac": {"to_ink": [(0x7C65, 0x7E08)]},
     "brucelee256": {"paper0": {0x07}},
+    "knlore": {"windows": "F1; F2-FF op!=A6"},   # MiSTer: xor=FF on F2-FF; here it fills the cells with the INK
+    "sabrew": {"windows": "F0-FF"},
+    "underw": {"windows": "F0-FF"},
+    "headoverheels": {"windows": "B9; 40-FF op=0A/EF"},
+    "scoobydoo256": {"windows": "FC; 40-FF op=0A/EF"},
+    "bubbler256": {"windows": "F9-FF"},
 }
+
+# "LO[-HI] [op=XX[/MM] | op!=XX[/MM]] [xor=XX]; ..." -> the block of the windows (64 bytes)
+def windows_block(text):
+    ws = []
+    for item in filter(None, (x.strip() for x in text.split(";"))):
+        words = item.split()
+        lo, _, hi = words[0].partition("-")
+        first, last = int(lo, 16), int(hi or lo, 16)
+        val, mask, neg, x = 0, 0, 0, 0
+        for wd in words[1:]:
+            if wd.startswith("op!=") or wd.startswith("op="):
+                neg = 1 if wd.startswith("op!=") else 0
+                v, _, m = wd.split("=", 1)[1].partition("/")
+                val, mask = int(v, 16), int(m or "FF", 16)
+            elif wd.startswith("xor="):
+                x = int(wd[4:], 16)
+            else:
+                raise ValueError(f"window {item!r}: {wd!r}")
+        if not 0 <= first <= last <= 0xFF:
+            raise ValueError(f"window {item!r}: pages")
+        ws.append(bytes([first, last, val, mask, neg, x]))
+    if not 1 <= len(ws) <= 8:
+        raise ValueError(f"windows {text!r}: 1 to 8")
+    return bytes([len(ws)]) + bytes(7) + b"".join(ws) + bytes(6 * (8 - len(ws))) + bytes(8)
 fixes = GAME_FIXES.get(sna_filename.stem.lower(), {})
 def colours(pl, off):   # the 8 colours of the pixels of a word of planes (k = 0: the right pixel)
     return [sum((pl[off * 8 + p] >> k & 1) << p for p in range(8)) for k in range(8)]
@@ -713,7 +762,7 @@ if dos:
     if start in (NO_RULE, KEEP):        # the program starts with the background 0
         start = 0 if 0 in backgrounds else NONE
     tail = bytearray(160)
-    tail[0] = 1                         # the rendering of Spec256 DOS
+    tail[0] = 1 | 2                     # the rendering of Spec256 DOS, the arithmetic of Spec256 DOS
     tail[1] = default
     tail[2:4] = holds.to_bytes(2, "little")
     lt = 0
@@ -731,6 +780,10 @@ if dos:
 
 flags = (1 if rom_planes else 0) | (2 if paper00inkff else 0) | (4 if hide_same else 0) | (8 if bk_over_ff else 0) | \
         (16 if rom0_planes else 0) | (32 if is128 else 0) | (64 if tail else 0)
+windows = windows_block(fixes["windows"]) if fixes.get("windows") else None
+if windows:
+    flags |= 128
+    print(f"read windows: {fixes['windows']}")
 o.write(b"K256")
 # the rules against the RAM of the snapshot (4000-FFFF)
 match = 0
@@ -772,6 +825,8 @@ if is128:
         o.write(bank_planes[n])
 if tail:
     o.write(tail)
+if windows:
+    o.write(windows)
 o.close()
 
 print(f"palette: {pal_filename or 'standard'}, cfg: {cfg_filename or 'none'}, ROM graphics: {gfb_filename or 'none'}, "
