@@ -43,7 +43,7 @@
 #            1, 3, 4, 6, 7, each 16384 bytes of RAM and 131072 of planes
 #   then     the block of the rules, if flag 6, 160 bytes; it replaces the rules of the header:
 #            0    flags: 0 the rendering of Spec256 DOS (indices C0-FF take the ink of the attribute, 0xFF is
-#                 a colour, the background only at index 0, no mixing), 1 the AY state at 136 is valid
+#                 a colour, the background only at index 0, no mixing)
 #            1    the background when no rule matches: n, 0xFE none, 0xFF the one before
 #            2 2  the conditions that hold in the snapshot (bit n: condition n)
 #            4    16 conditions of a byte: address (2), mask, value; it holds while the byte at the address,
@@ -51,9 +51,9 @@
 #            68 2 the conditions that compare with <
 #            72   16 rules: background (n, 0xFE none, 0xFD keep the one there is, 0xFF no rule), conditions
 #                 (2, bit n: condition n), reserved; the first rule whose conditions all hold
-#            136  the AY: the register selected, R0..R15
+#            136  17 reserved (zeros)
 #            153  the background at the start (as byte 1), 154 6 reserved
-#            Spec256 DOS v1.2 chose its backgrounds with routines of its own (DOS_BACKGROUNDS below, read
+#            Spec256 DOS v1.2 chose its backgrounds with routines of its own (DOS_ROUTINES below, read
 #            from SPEC256.EXE by the Spec256 core for MiSTer, albconde/SPEC256_MISTER).
 # The planes of a 128K bank (as ZX-Poly): NAME.GFn, else its part of NAME.GFX (the banks 5, 2 and the
 # one at C000 in the snapshot), else the bank itself in every plane (not coloured). The registers of a
