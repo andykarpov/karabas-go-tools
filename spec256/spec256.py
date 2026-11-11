@@ -357,11 +357,116 @@ if is128:
             bank_gfx[n] = data
     bank_planes = {n: planes(bank_gfx[n], 16384) if n in bank_gfx else plain(bank_ram[n]) for n in range(8)}
     print(f"128K: #7FFD={p7ffd:02X}, PC={pc128:04X}, banks with planes: {sorted(bank_gfx)}")
+    bank_ram = {n: bytearray(bank_ram[n]) for n in range(8)}
+    bank_planes = {n: bytearray(bank_planes[n]) for n in range(8)}
+    def cell(addr):     # the RAM and the planes of an address of 4000-FFFF, as the snapshot pages it
+        n = 5 if addr < 0x8000 else 2 if addr < 0xC000 else top
+        return bank_ram[n], bank_planes[n], addr & 0x3FFF
+    all_ram = [(bank_ram[n], bank_planes[n]) for n in range(8)]
+else:
+    sna_planes = bytearray(planes(gfx, 49152))
+    def cell(addr):
+        return sna, sna_planes, addr - 0x4000
+    all_ram = [(sna, sna_planes)]
+
+# the standard Spec256 palette (sp256.pal of GZX, colour 255 white)
+DEFAULT_PALETTE = bytes.fromhex(
+    "00000000009b172fab3763bb5b93cb83bfdbb3e3ebe7ffffb70000bf1717cb3333d35353df7777e79b9bf3c3c3ffefef"
+    "00372307533b176f532f8b734fa78f73c3b39fdfd3d3fff7ff4b00ff771fff9f3fffbf63ffdb83ffeba7fff7c7ffffeb"
+    "672b007b3b0b8f4f23a7673bbb835bd39f7fe7bfa7ffe7d77f004b8f135ba32b73b34b8bc76fa3d79bbfebcbdfffffff"
+    "0b23731b33872f479b4b63af677fc38b9fd7b3bfebdfe7ff337f23438f1f53a31f6bb31b87c717abd70fcfeb07ffff00"
+    "c30000af1700bb3300c75300d77b00e3a300efcf00ffff004b4b336363477b7b5b979773afaf8bcbcba3e3e3bfffffdb"
+    "0000004343436363637f7f7f9f9f9fbbbbbbdbdbdbfbfbfba36f57af7f63bb8f6fc7a37bd7b78be3c79befdbabffefbb"
+    "00abcb17b3cf33bbd74fc7df6bcfe38bdbebafe7f3d3f3fb00d30017d7172fdf2f4be34b67eb6783ef83a3f7a3c3ffc3"
+    "4f4f675f5f7b73738f8b8ba79f9fbbb7b7d3cbcbe7e7e7ff8b83009b930faba323bbb33bcbc353dbd773ebe793fffbbb"
+    "3757573b6f6f3b87873b9f9f33b7b727cfcf17e7e707ffff00000000001b00003700004f00006b0000870000a30000bf"
+    "0000001b00003700004f00006b0000870000a30000bf00000000001b001b3700374f004f6b006b870087a300a3bf00bf"
+    "000000001b00003700004f00006b0000870000a30000bf00000000001b1b003737004f4f006b6b00878700a3a300bfbf"
+    "0000001b1b003737004f4f006b6b00878700a3a300bfbf000000001b1b1b3737374f4f4f6b6b6b878787a3a3a3bfbfbf"
+    "00000000000000000000000000000000000000000000000000003f00005700007300008f0000ab0000c70000e30000ff"
+    "3f00005700007300008f0000ab0000c70000e30000ff00003f003f5700577300738f008fab00abc700c7e300e3ff00ff"
+    "003f00005700007300008f0000ab0000c70000e30000ff00000000002323004747006b6b008f8f00b3b300dbdb00ffff"
+    "3f3f005757007373008f8f00abab00c7c700e3e300ffff003f3f3f5757577373738f8f8fabababc7c7c7e3e3e3ffffff"
+)
+
+def read_palette(name):
+    data = file_read(name, "rb")
+    if len(data) == 768:
+        return bytes(data)
+    values = [int(v) for v in data.decode("ascii", "replace").split() if v.isdigit()]   # GZX: 768 numbers
+    if len(values) != 768 or max(values) > 255:
+        print(f"{name}: not a palette of 768 bytes or 768 numbers")
+        exit(1)
+    return bytes(values)
+
+# the fixes of a game, by the name of its snapshot (found by the Spec256 core for MiSTer,
+# albconde/SPEC256_MISTER, tools/spec256_games.ini):
+#   patch     bytes of the main CPU: Cybernoid II wraps the bit that leaves a row of a sprite with
+#             JR NC / SET 7,(HL), on the carry of the main CPU, which gives the bit its colour; RL (HL) /
+#             RRC (HL) do the same with the carry of each lane
+#   decolour  the planes of these addresses become the byte of the main CPU (code, or an entry of a
+#             table of reversed bytes that the artist painted: Mad Mix 2 at 5B00)
+#   to_ink    every coloured pixel becomes C0 + its brightness (1..7), so the Spec256 DOS rendering
+#             gives it the ink of the attribute: the rocket of Jetpac changes colour as in the original
+#   paper0    colours that become 0 on the paper pixels (bit 0 in the main byte) of the RAM and the ROM
+#             planes: Bruce Lee (its background shows there)
+GAME_FIXES = {
+    "cybernoid_ii256": {"patch": {0x80C8: 0xCB, 0x80C9: 0x16, 0x80CA: 0xCB, 0x80CB: 0x0E,
+                                  0x8136: 0xCB, 0x8137: 0x1E, 0x8138: 0xCB, 0x8139: 0x06},
+                        "decolour": [(0x80C8, 0x80CB), (0x8136, 0x8139)]},
+    "madmix2fim": {"decolour": [(0x5B1C, 0x5B1F), (0x5B3C, 0x5B3D)]},
+    "jetpac": {"to_ink": [(0x7C65, 0x7E08)]},
+    "brucelee256": {"paper0": {0x07}},
+}
+fixes = GAME_FIXES.get(sna_filename.stem.lower(), {})
+def colours(pl, off):   # the 8 colours of the pixels of a word of planes (k = 0: the right pixel)
+    return [sum((pl[off * 8 + p] >> k & 1) << p for p in range(8)) for k in range(8)]
+def set_colours(pl, off, cs):
+    for p in range(8):
+        pl[off * 8 + p] = sum((cs[k] >> p & 1) << k for k in range(8))
+for addr, v in fixes.get("patch", {}).items():
+    ram, pl, off = cell(addr)
+    ram[off] = v
+for lo, hi in fixes.get("decolour", []):
+    for addr in range(lo, hi + 1):
+        ram, pl, off = cell(addr)
+        pl[off * 8:off * 8 + 8] = bytes([ram[off]]) * 8
+if fixes.get("to_ink"):
+    pal = read_palette(companion(".pal")) if companion(".pal") else DEFAULT_PALETTE
+    shade = [min(7, max(1, round(7 * (0.299 * pal[3*i] + 0.587 * pal[3*i+1] + 0.114 * pal[3*i+2]) / 255)))
+             for i in range(256)]
+    n = 0
+    for lo, hi in fixes["to_ink"]:
+        for addr in range(lo, hi + 1):
+            ram, pl, off = cell(addr)
+            cs = colours(pl, off)
+            if any(cs):
+                set_colours(pl, off, [0xC0 | shade[c] if c else 0 for c in cs])
+                n += 1
+    print(f"to_ink: {n} words")
+def clear_paper(ram, pl, words, colours_out):
+    n = 0
+    for off in range(words):
+        if pl[off * 8:off * 8 + 8] == bytes([ram[off]]) * 8:
+            continue
+        cs = colours(pl, off)
+        new = [0 if c in colours_out and not ram[off] >> k & 1 else c for k, c in enumerate(cs)]
+        if new != cs:
+            set_colours(pl, off, new)
+            n += 1
+    return n
+if fixes:
+    print(f"fixes of {sna_filename.stem}: {', '.join(sorted(fixes))}")
+if fixes.get("paper0"):
+    n = sum(clear_paper(ram, pl, len(ram), fixes["paper0"]) for ram, pl in all_ram)
+    print(f"paper0: {n} words")
+
+if is128:
     o.write(bank_ram[5] + bank_ram[2] + bank_ram[0])
     o.write(bank_planes[5] + bank_planes[2] + bank_planes[0])
 else:
     o.write(sna)
-    o.write(planes(gfx, 49152))
+    o.write(sna_planes)
 
 """
 SNA header:
@@ -434,26 +539,6 @@ if args.plain:
     o.close()
     exit(0)
 
-# the standard Spec256 palette (sp256.pal of GZX, colour 255 white)
-DEFAULT_PALETTE = bytes.fromhex(
-    "00000000009b172fab3763bb5b93cb83bfdbb3e3ebe7ffffb70000bf1717cb3333d35353df7777e79b9bf3c3c3ffefef"
-    "00372307533b176f532f8b734fa78f73c3b39fdfd3d3fff7ff4b00ff771fff9f3fffbf63ffdb83ffeba7fff7c7ffffeb"
-    "672b007b3b0b8f4f23a7673bbb835bd39f7fe7bfa7ffe7d77f004b8f135ba32b73b34b8bc76fa3d79bbfebcbdfffffff"
-    "0b23731b33872f479b4b63af677fc38b9fd7b3bfebdfe7ff337f23438f1f53a31f6bb31b87c717abd70fcfeb07ffff00"
-    "c30000af1700bb3300c75300d77b00e3a300efcf00ffff004b4b336363477b7b5b979773afaf8bcbcba3e3e3bfffffdb"
-    "0000004343436363637f7f7f9f9f9fbbbbbbdbdbdbfbfbfba36f57af7f63bb8f6fc7a37bd7b78be3c79befdbabffefbb"
-    "00abcb17b3cf33bbd74fc7df6bcfe38bdbebafe7f3d3f3fb00d30017d7172fdf2f4be34b67eb6783ef83a3f7a3c3ffc3"
-    "4f4f675f5f7b73738f8b8ba79f9fbbb7b7d3cbcbe7e7e7ff8b83009b930faba323bbb33bcbc353dbd773ebe793fffbbb"
-    "3757573b6f6f3b87873b9f9f33b7b727cfcf17e7e707ffff00000000001b00003700004f00006b0000870000a30000bf"
-    "0000001b00003700004f00006b0000870000a30000bf00000000001b001b3700374f004f6b006b870087a300a3bf00bf"
-    "000000001b00003700004f00006b0000870000a30000bf00000000001b1b003737004f4f006b6b00878700a3a300bfbf"
-    "0000001b1b003737004f4f006b6b00878700a3a300bfbf000000001b1b1b3737374f4f4f6b6b6b878787a3a3a3bfbfbf"
-    "00000000000000000000000000000000000000000000000000003f00005700007300008f0000ab0000c70000e30000ff"
-    "3f00005700007300008f0000ab0000c70000e30000ff00003f003f5700577300738f008fab00abc700c7e300e3ff00ff"
-    "003f00005700007300008f0000ab0000c70000e30000ff00000000002323004747006b6b008f8f00b3b300dbdb00ffff"
-    "3f3f005757007373008f8f00abab00c7c700e3e300ffff003f3f3f5757577373738f8f8fabababc7c7c7e3e3e3ffffff"
-)
-
 # games that want colour 0 and 0xFF drawn from the palette (ZX-Poly's spec256appbase.txt)
 PLAIN_00_FF = ("booty", "cybernoid_ii256", "eaglesns", "rene256")
 
@@ -516,16 +601,6 @@ def cond_holds(c, byte):
     addr, m, v, op = c
     return (byte & m) == v if op == "=" else (byte & m) < v
 
-def read_palette(name):
-    data = file_read(name, "rb")
-    if len(data) == 768:
-        return bytes(data)
-    values = [int(v) for v in data.decode("ascii", "replace").split() if v.isdigit()]   # GZX: 768 numbers
-    if len(values) != 768 or max(values) > 255:
-        print(f"{name}: not a palette of 768 bytes or 768 numbers")
-        exit(1)
-    return bytes(values)
-
 cfg = {}
 rules = []
 cfg_filename = companion(".cfg")
@@ -577,6 +652,13 @@ if gfb_filename:
         print(f"{gfb_filename}: all 0, not used")
         rom_planes = None
         gfb_filename = None
+    elif fixes.get("paper0"):
+        # a word of 0 is the ROM itself: the ROM 1 under the coloured words (the font)
+        rom1 = open(Path(__file__).absolute().parent.parent / "roms" / "82.rom", "rb").read()
+        rp = bytearray(rom_planes)
+        rom = bytes(rom1[i] if any(rp[i * 8:i * 8 + 8]) else 0 for i in range(16384))
+        print(f"paper0 in the ROM planes: {clear_paper(bytearray(rom), rp, 16384, fixes['paper0'])} words")
+        rom_planes = bytes(rp)
 
 # the ROM 0 of the 128K (NAME.GFA): only a 128K game can page it in (a 48K one runs with #7FFD locked)
 gfa_filename = companion(".gfa")
