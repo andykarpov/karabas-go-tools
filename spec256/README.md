@@ -96,7 +96,7 @@ pages (A15..A8 of the address of the main CPU), `op=XX/MM` (`op!=`) a filter on 
 
 | Game | Windows |
 |---|---|
-| Knight Lore | `F1; F2-FF op!=A6 xor=FF` |
+| Knight Lore | `F1; F2-FF op!=A6` (the MiSTer core has `xor=FF` on the second: on our core that fills the cells around the sprites with the INK, checked on a Mini G) |
 | Sabre Wulf, Underwurlde | `F0-FF` |
 | Head over Heels | `B9; 40-FF op=0A/EF` (`LD A,(BC)`, `LD A,(DE)`) |
 | Scooby-Doo | `FC; 40-FF op=0A/EF` |

@@ -436,7 +436,7 @@ GAME_FIXES = {
     "madmix2fim": {"decolour": [(0x5B1C, 0x5B1F), (0x5B3C, 0x5B3D)], "windows": "5B"},
     "jetpac": {"to_ink": [(0x7C65, 0x7E08)]},
     "brucelee256": {"paper0": {0x07}},
-    "knlore": {"windows": "F1; F2-FF op!=A6 xor=FF"},
+    "knlore": {"windows": "F1; F2-FF op!=A6"},   # MiSTer: xor=FF on F2-FF; here it fills the cells with the INK
     "sabrew": {"windows": "F0-FF"},
     "underw": {"windows": "F0-FF"},
     "headoverheels": {"windows": "B9; 40-FF op=0A/EF"},
