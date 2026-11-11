@@ -32,6 +32,9 @@ missing.
 | `.B00`–`.B99` | 64000 | backgrounds 320×200, a palette index per pixel; the core shows x 32..287, y 4..195 |
 
 Notes on the collections:
+- The original Spec256 packs (Spec256 v1.2 site: `Knlore.zip`, `Underw.zip`, `Armymov2.zip`, …) are the
+  most complete source of the 12 Spec256 games: some collections miss files (`UNDERW.B00`, all of Army
+  Moves 2). `ARMYMOV1.B01` and `GAMEOV1.B01`, which their background routines ask for, are in no pack.
 - `ROM0.GFX` of the original Spec256 games (Jetpac, Sabre Wulf) is the `.GFB` of the game: rename it to
   `NAME.GFB` (the name is the same in several games, so it can not be found by the name of the snapshot).
 - A `.GFA` / `.GF7` next to a 48K game is not used: a 48K game runs with `#7FFD` locked (ROM 1, banks 5, 2, 0).
@@ -60,6 +63,28 @@ As ZX-Poly does (GZX shows the colours in 48K only):
 | `BkOverFF` | 0 | with a background, 0xFF is transparent too |
 | `NN: addr=VVh` | | background NN while the byte at addr is VV (up to 16 rules, the first that matches) |
 
+### The games of Spec256 DOS
+
+The 12 games of Spec256 v1.2 (Army Moves 1 and 2, Cybernoid, Game Over 1 and 2, Jetpac, Knight Lore,
+Phantis, Abu Simbel Profanation, Sabre Wulf, Solomon's Key, Underwurlde; known by the name of the 48K
+snapshot) have no `.CFG`: the program chose their backgrounds with routines of its own and drew them in
+its own way. As the Spec256 core for MiSTer (albconde/SPEC256_MISTER) read them from `SPEC256.EXE`, the
+converter writes for them the block of the rules (below): the background routine of the game from the table
+of games of the program, as conditions on bytes of the RAM, and the flag of the rendering of Spec256 DOS
+(colours C0–FF take the INK of the attribute, 0xFF is a colour, the background only at colour 0, no mixing).
+A rule that shows a background without its file shows none.
+
+### Fixes of games
+
+By the name of the snapshot (`GAME_FIXES`, found by the Spec256 core for MiSTer):
+
+| Game | Fix |
+|---|---|
+| Cybernoid II | `JR NC / SET 7,(HL)` (and `SET 0`), which wrap the bit leaving a row of a sprite on the carry of the main CPU, become `RL (HL) / RRC (HL)` (`RR / RLC`): the same for the main CPU, each lane with its own carry; the planes of those bytes = the code |
+| Mad Mix 2 | the painted entries of its table of reversed bytes at `5B00` lose their colour |
+| Jetpac | the coloured pixels of `7C65`–`7E08` become C0 + their brightness: with the DOS rendering they take the INK (the rocket changes colour as in the original) |
+| Bruce Lee | colour 07 on paper pixels (bit 0 of the main byte), in the RAM and the ROM planes, becomes 0: the background shows there |
+
 The other keys of EmuZWin (`GFXLeveled*`, `UpMixChgBright`, `DownMixPaper`, …) are not used; what they mean
 and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys).
 
@@ -73,7 +98,7 @@ and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys
 | 442396 | | the extension (not with `--plain`), little endian: |
 | +0 | 4 | `K256` |
 | +4 | 1 | version: 1; 2 with flag 4 or 5 (a core that knows version 1 leaves such an extension out) |
-| +5 | 1 | flags: 0 ROM 1 planes, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF, 4 ROM 0 planes, 5 the 128K block |
+| +5 | 1 | flags: 0 ROM 1 planes, 1 Paper00InkFF, 2 HideSameInkPaper, 3 BkOverFF, 4 ROM 0 planes, 5 the 128K block, 6 the block of the rules (a core before converter v1.5 does not read it and plays as before) |
 | +6 | 1 | UpColorsMixed |
 | +7 | 1 | DownColorsMixed |
 | +8 | 1 | number of backgrounds (the highest Bnn + 1) |
@@ -87,5 +112,15 @@ and why they do not matter for the games there are: [EZX.md](EZX.md#the-cfg-keys
 | | 131072 | ROM 0 planes (`.GFA`), if flag 4 (flag 0 is then set too: a `.GFB` of 0) |
 | | 49152 × n | the backgrounds, 256×192 each |
 | | 8 + 5 × 147456 | the 128K block, if flag 5: `#7FFD` and 7 reserved bytes, then the banks 1, 3, 4, 6, 7: 16384 bytes of RAM and 131072 of planes each |
+| | 160 | the block of the rules, if flag 6; it replaces the rules at +784 (and +10, +11): |
+| ++0 | 1 | flags: 0 the rendering of Spec256 DOS |
+| ++1 | 1 | the background when no rule matches: n, `FE` none, `FF` the one there is |
+| ++2 | 2 | the conditions that hold in the snapshot (bit n: condition n) |
+| ++4 | 64 | 16 conditions: address (2), mask, value; it holds while the byte at the address, masked, = the value (< with its bit at ++68); the core follows the writes of the CPU |
+| ++68 | 2 | the conditions that compare with < |
+| ++72 | 64 | 16 rules: background (n, `FE` none, `FD` keep the one there is, `FF` no rule), conditions (2, bit n: condition n), reserved; the first rule whose conditions all hold |
+| ++136 | 17 | reserved (zeros) |
+| ++153 | 1 | the background at the start (n, `FE` none) |
+| ++154 | 6 | reserved |
 
 A 48K game is version 1, byte for byte as the converter v1.3 wrote it.
