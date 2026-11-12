@@ -7,7 +7,7 @@ import struct
 
 BOARDS = { 1: "go", 2: "mini", 3: "minig" }
 NAMES = { 1: "STRINGS", 2: "CORE", 3: "LOADER", 4: "OSD", 5: "BUTTONS", 6: "MATRIX", 7: "EEPROM_INIT",
-          8: "ROMS", 9: "BITSTREAM" }
+          8: "ROMS", 9: "BITSTREAM", 10: "BITSTREAM_LINK2" }
 TYPES = ["S", "N", "T", "H", "P", "F", "FL", "M", "-"]
 
 parser = argparse.ArgumentParser(description = "kgo2 core file dump")
@@ -41,8 +41,9 @@ for t, m, ofs, n in table:
     print("\n[%s] boards %s, offset %d, %d bytes" % (NAMES.get(t, "type %d" % t), boards(m), ofs, n))
     if t == 2:
         size, i, nm, b, typ, vis, order, rtc, eep, spi, drv = struct.unpack_from('<HHHHBBBBBBH', sec, 0)
-        print("  id %r name %r build %r type %d visible %d order %d rtc %d eeprom %d spi %d drives %r" %
-              (s(i), s(nm), s(b), typ, vis, order, rtc, eep, spi, s(drv)))
+        link = sec[16] if size > 16 else 1
+        print("  id %r name %r build %r type %d visible %d order %d rtc %d eeprom %d spi %d drives %r link %d" %
+              (s(i), s(nm), s(b), typ, vis, order, rtc, eep, spi, s(drv), link))
     elif t == 3:
         size, d, e, sd, flags, nf, fo = struct.unpack_from('<HHHHBBH', sec, 0)
         files = [s(struct.unpack_from('<H', sec, fo + 2 * k)[0]) for k in range(nf)]

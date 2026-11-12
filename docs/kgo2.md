@@ -242,7 +242,8 @@ let a newer version append fields: the firmware reads the fields it knows and sk
 | 6 | MATRIX | no (`core`) |
 | 7 | EEPROM_INIT | no (FF) |
 | 8 | ROMS | no |
-| 9 | BITSTREAM | yes |
+| 9 | BITSTREAM | yes (a link 1 core) |
+| 10 | BITSTREAM_LINK2 | yes (a link 2 core): the bitstream of a core of link v2, in its own type so a firmware without link v2 finds no bitstream for the board and does not load the core |
 
 ### STRINGS
 
@@ -265,6 +266,8 @@ distinct string once. One STRINGS section serves every board.
 | 12 | 1 | EEPROM bank (as kgo1: 0..3 the 24C08, 4..254 the `.eep` file, 255 none) |
 | 13 | 1 | SPI frequency in MHz, 0 = default |
 | 14 | 2 | drives (string): the names of the physical floppy drives, comma separated (`A,B`); empty: `DF0,DF1` |
+| 16 | 1 | link: 1 = MCU link v1, 2 = link v2 (karabas-go-firmware `docs/link_v2.md`); a record of 16 bytes (older make_core) is link 1 |
+| 17 | 1 | reserved, 0 |
 
 ### LOADER
 
