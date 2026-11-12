@@ -297,6 +297,9 @@ def kgo1_write():
     global d
     d = json.loads(file_read(filename), object_hook=lambda d: SimpleNamespace(**d))
 
+    if getattr(d, "link", 1) != 1:
+        fail("\"link\" 2 is for kgo2 (.kg) files only")
+
     # check bitstream and roms exists
     bitstream = file_read(d.bitstream, "rb")
     bitstream_size = len(bitstream)
@@ -406,10 +409,10 @@ def kgo1_write():
 
 KG2_BOARDS = { "go": 1, "mini": 2, "minig": 3 } # the HW_ID of each board: bit HW_ID of the masks
 KG2_VERSION = 1
-SEC_STRINGS, SEC_CORE, SEC_LOADER, SEC_OSD, SEC_BUTTONS, SEC_MATRIX, SEC_EEPROM, SEC_ROMS, SEC_BITSTREAM = range(1, 10)
+SEC_STRINGS, SEC_CORE, SEC_LOADER, SEC_OSD, SEC_BUTTONS, SEC_MATRIX, SEC_EEPROM, SEC_ROMS, SEC_BITSTREAM, SEC_BITSTREAM_LINK2 = range(1, 11)
 KG2_SEC_NAMES = { SEC_STRINGS: "STRINGS", SEC_CORE: "CORE", SEC_LOADER: "LOADER", SEC_OSD: "OSD",
                   SEC_BUTTONS: "BUTTONS", SEC_MATRIX: "MATRIX", SEC_EEPROM: "EEPROM_INIT",
-                  SEC_ROMS: "ROMS", SEC_BITSTREAM: "BITSTREAM" }
+                  SEC_ROMS: "ROMS", SEC_BITSTREAM: "BITSTREAM", SEC_BITSTREAM_LINK2: "BITSTREAM_LINK2" }
 KG2_ITEM_SIZE = 48
 KG2_STATE_TYPES = ('S', 'F', 'FL', 'R')       # the items whose value is kept in /config/<id>.ini
 KG2_SWITCH_TYPES = ('S', 'N', 'T', 'H', 'R')  # the items sent with CMD_SWITCHES
@@ -528,9 +531,17 @@ def kg2_core(cfg, strings):
         if not isinstance(v, int) or not 0 <= v <= 255:
             fail("\"%s\" must be 0..255" % k)
         return v
-    return struct.pack('<HHHHBBBBBBH', 16, strings.ref(cfg["id"]), strings.ref(cfg["name"]), strings.ref(cfg["build"]),
+    return struct.pack('<HHHHBBBBBBHBx', 18, strings.ref(cfg["id"]), strings.ref(cfg["name"]), strings.ref(cfg["build"]),
                        types[cfg["type"]], byte("visible", 1), byte("order", 0), byte("rtc_mode", 0),
-                       byte("eeprom_bank", 255), byte("spi_freq", 0), strings.ref(kg2_drives(cfg)))
+                       byte("eeprom_bank", 255), byte("spi_freq", 0), strings.ref(kg2_drives(cfg)), kg2_link(cfg))
+
+# "link": the MCU link of the core (karabas-go-firmware docs/link_v2.md): 1 (default) or 2. The
+# bitstream of a link 2 core goes into BITSTREAM_LINK2, so an older firmware finds none for its board
+def kg2_link(cfg):
+    v = cfg.get("link", 1)
+    if v not in (1, 2):
+        fail("\"link\" must be 1 or 2")
+    return v
 
 # "drives": the names of the physical floppy drives in the browser of a physical F item (Karabas Go),
 # e.g. ["A", "B"]; one string "A,B", empty (not given) for the firmware's DF0 / DF1
@@ -858,13 +869,14 @@ def kg2_write():
                 fail("%s: \"bitstream\" is not set" % board)
             bitstream = file_read(cfg["bitstream"], "rb")
         else:
-            kept = [d for m, d in old.get(SEC_BITSTREAM, []) if m & bit]
+            kept = [d for m, d in old.get(SEC_BITSTREAM, []) + old.get(SEC_BITSTREAM_LINK2, []) if m & bit]
             if not kept:
                 print("%s: no bitstream (not in --boards, not in %s): the board is left out" % (board, outfile))
                 continue
             bitstream = kept[0]
         cfg_ns = kg2_ns(cfg)
-        secs = { SEC_CORE: kg2_core(cfg, strings), SEC_BITSTREAM: bitstream }
+        secs = { SEC_CORE: kg2_core(cfg, strings),
+                 SEC_BITSTREAM_LINK2 if kg2_link(cfg) == 2 else SEC_BITSTREAM: bitstream }
         loader = kg2_loader(cfg, strings)
         if loader is not None:
             secs[SEC_LOADER] = loader
