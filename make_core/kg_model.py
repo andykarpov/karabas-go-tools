@@ -46,7 +46,7 @@ def read_kgo1(data):
     m["core"] = {
         "id": _str(data[4:36]), "name": _str(data[36:68]), "build": _str(data[68:76]),
         "visible": data[76], "order": data[77], "type": data[78], "eeprom_bank": data[79],
-        "rtc_mode": data[88], "spi_freq": data[185], "drives": "",
+        "rtc_mode": data[88], "spi_freq": data[185], "drives": "", "link": 1,
     }
     m["loader"] = {"dir": _str(data[89:121]), "exts": norm_exts(_str(data[153:185])),
                    "save_dir": _str(data[186:218])}
@@ -116,7 +116,7 @@ def read_kgo2(data, board):
         t, bm, ofs, ln = struct.unpack_from("<HHII", data, hsize + i * esize)
         if bm & bit:
             sec[t] = data[ofs:ofs + ln]
-    if 9 not in sec:
+    if 9 not in sec and 10 not in sec:
         return None
     strings = sec[1]
 
@@ -125,9 +125,10 @@ def read_kgo2(data, board):
 
     m = {"format": 2}
     c = sec[2]
-    _, i, n, b, typ, vis, order, rtc, eep, spi, drv = struct.unpack_from("<HHHHBBBBBBH", c, 0)
+    csize, i, n, b, typ, vis, order, rtc, eep, spi, drv = struct.unpack_from("<HHHHBBBBBBH", c, 0)
     m["core"] = {"id": s(i), "name": s(n), "build": s(b), "visible": vis, "order": order, "type": typ,
-                 "eeprom_bank": eep, "rtc_mode": rtc, "spi_freq": spi, "drives": s(drv)}
+                 "eeprom_bank": eep, "rtc_mode": rtc, "spi_freq": spi, "drives": s(drv),
+                 "link": c[16] if csize > 16 else 1}
     m["loader"] = {"dir": "", "exts": [], "save_dir": ""}
     m["loader_files"] = []
     if 3 in sec:
@@ -139,7 +140,7 @@ def read_kgo2(data, board):
     m["buttons"] = norm_buttons(bytes(bt[1:19]) if bt else b"\xff" * 18)
     m["eeprom"] = bytes(sec[7]) if 7 in sec else b"\xff" * 256
     m["matrix"] = bytes(sec[6]) if 6 in sec else bytes(256)
-    m["bitstream"] = bytes(sec[9])
+    m["bitstream"] = bytes(sec[9] if 9 in sec else sec[10])
     roms, r, p = [], sec.get(8, b""), 0
     while p < len(r):
         ln, addr = struct.unpack_from("<II", r, p)
