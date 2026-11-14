@@ -19,9 +19,9 @@ Development tools for the Karabas Go / Mini / Mini G cores, plain Python 3 scrip
 
 ## Rules
 
-- **The Python `make_core.py` is the one in use.** `makecore/` (Go) is untracked and not used: don't change it (the backlog has the question whether to develop or delete it).
+- **The Python `make_core.py` is the only core packer.** (The untracked Go `makecore/` rewrite was deleted 2026-11-14.)
 - **A header field change** goes into `make_core.py`, `make_core/README.md`, `README.ru.md` and `core_structure.txt` together (kgo1); a kgo2 change into `make_core.py`, `docs/kgo2.md`, `kg_dump.py`, `kg_model.py` and the parser of the firmware (`lib/common/kg2_format`, its fixture).
-- **Untracked files are the user's** (`makecore/`, `rs232mnt/`, `make_core/core_structure_v2.txt`): never add or delete them.
+- **Untracked files are the user's** (`rs232mnt/`, `make_core/core_structure_v2.txt`): never add or delete them.
 - **Check a change** by packing a few real cores before and after (e.g. the boot core in `../karabas-go-core-menu/src`, `python3 make_core.py core.json /tmp/boot.kg`) and comparing the files byte by byte (`cmp`): only the bytes of the changed field may differ. kgo1 must stay byte-identical too: pack a kgo1 json (the per-board jsons are in the cores' git history before 2026-11-04, e.g. `git show <commit>^:src/core_minig.json`) to a `.kg3` before and after. Don't run the cores' `make <board>-core` targets for this: they may start a full ISE build.
 - Branches and PRs go to `master`; commit messages start with the tool (`make_core: ...`, `spec256: ...`).
 
