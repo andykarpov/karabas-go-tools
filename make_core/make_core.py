@@ -565,14 +565,20 @@ def kg2_loader(cfg, strings):
             return None
         loader = { k2: cfg[k1] for k1, k2 in (("dir", "dir"), ("extensions", "exts"), ("filename", "file"),
                                                ("save_dir", "save_dir")) if k1 in cfg }
-    unknown = set(loader) - { "dir", "exts", "extensions", "file", "filename", "autoload", "save_dir" }
+    unknown = set(loader) - { "dir", "exts", "extensions", "file", "filename", "autoload", "save_dir",
+                              "save_name" }
     if unknown:
         fail("loader: unknown keys %s" % ", ".join(sorted(unknown)))
     files = kg2_files("loader file", loader.get("file", loader.get("filename")))
-    head = struct.pack('<HHHHBBH', 12, strings.ref(kg2_path("loader dir", loader.get("dir", ""))),
+    # save_name: the backup RAM file of every game (<save_name>.sav), not named by the game
+    save_name = loader.get("save_name", "")
+    kg2_ascii("loader save_name", save_name, 32)
+    if "/" in save_name or "\\" in save_name or save_name.strip() != save_name:
+        fail("loader save_name: '%s' must be a file name, without a dir" % save_name)
+    head = struct.pack('<HHHHBBHH', 14, strings.ref(kg2_path("loader dir", loader.get("dir", ""))),
                        strings.ref(kg2_exts("loader", loader.get("exts", loader.get("extensions")))),
                        strings.ref(kg2_path("loader save_dir", loader.get("save_dir", ""))),
-                       1 if loader.get("autoload", True) else 0, len(files), 12)
+                       1 if loader.get("autoload", True) else 0, len(files), 14, strings.ref(save_name))
     return head + b''.join(struct.pack('<H', strings.ref(f)) for f in files)
 
 def kg2_option_list(where, item):

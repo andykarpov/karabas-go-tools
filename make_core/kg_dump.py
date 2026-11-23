@@ -47,7 +47,9 @@ for t, m, ofs, n in table:
     elif t == 3:
         size, d, e, sd, flags, nf, fo = struct.unpack_from('<HHHHBBH', sec, 0)
         files = [s(struct.unpack_from('<H', sec, fo + 2 * k)[0]) for k in range(nf)]
-        print("  dir %r exts %r save_dir %r autoload %d files %r" % (s(d), s(e), s(sd), flags & 1, files))
+        sn = struct.unpack_from('<H', sec, 12)[0] if size >= 14 else 0
+        print("  dir %r exts %r save_dir %r save_name %r autoload %d files %r" %
+              (s(d), s(e), s(sd), s(sn), flags & 1, files))
     elif t == 4:
         cnt, isize, _ = struct.unpack_from('<HHI', sec, 0)
         for k in range(cnt):

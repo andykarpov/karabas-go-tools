@@ -138,7 +138,10 @@ An item of type `R` is a switch whose options are shown as one row each, with th
 
 - `loader` (FILELOADER cores): `dir` the start dir of the file list, `exts`, `file` the default file,
   `autoload` load the default / last file at the start of the core, `save_dir` the dir of the
-  backup RAM files. The kgo1 top-level keys `dir`, `extensions`, `filename`, `save_dir` are taken
+  backup RAM files, `save_name` one name for them (`"pak0"`: `<save_dir>/pak0.sav`, save states
+  `pak0.ss<n>`; an extension is dropped) instead of the name of the game (the file of the loader or
+  of the `FL` item sent last), also for a core that loads no file. `loader` is read for an OSD core
+  too (only `save_dir` / `save_name` mean something there). The kgo1 top-level keys `dir`, `extensions`, `filename`, `save_dir` are taken
   into `loader` when it is not given.
 - F / FL items: `slot`, `dir`, `exts`, `file`, `autoload` (FL), `physical` (F, Karabas Go: the
   physical floppy drives in the browser), `readonly` (F: the image is mounted without writes).
@@ -280,6 +283,7 @@ distinct string once. One STRINGS section serves every board.
 | 8 | 1 | flags: bit 0 autoload |
 | 9 | 1 | number of file candidates |
 | 10 | 2 | offset (in this section) of the candidates: 2 bytes (a string) each |
+| 12 | 2 | save name (string, empty: the name of the game); a record of 12 bytes (older make_core) has none |
 
 ### OSD
 
